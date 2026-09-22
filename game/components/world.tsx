@@ -7,6 +7,7 @@ import { HOME_POSITIONS, CLEARINGS, positionOf } from "@/lib/game";
 import { createTapTracker } from "@/lib/pointer-tap";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
+import "@babylonjs/core/Culling/ray";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
