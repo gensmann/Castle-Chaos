@@ -20,6 +20,7 @@ The portable starter provides **local-only mock sign-in** at `/signin-with-chatg
 ```sh
 npm run typecheck
 npm run check:rules
+npm run check:controls
 # Requires the production Worker running locally on port 8787:
 npm run check:api
 ```
@@ -27,6 +28,8 @@ npm run check:api
 The API check uses separate disposable local identities. It refuses non-loopback origins. It checks simultaneous writes, one active castle, turn ownership, idempotency, private intelligence, joining, settlement and surrender.
 
 ## How to play
+
+Open **How to play** in the game, or read the shareable English guide at `/guide`. The guide includes a verified first-turn build order, touch controls, building and weapon progression, guest loyalty, multiplayer setup and victory conditions. The entire game remains in English regardless of the browser language.
 
 - Choose a clearing: meadow grants 15 morale, ridge 40 health, grove 50 timber. Each ruler settles exactly once.
 - Spend three orders per turn. Build, upgrade, recruit, repair, feast or send guests on quests.
@@ -53,6 +56,14 @@ Multiplayer synchronizes authoritative outcomes through short polling (2.5–4 s
 Generated source art and exact generation prompts are in `assets/masters/`, `assets/art-prompts.json`, and `assets/extra-texture-prompts.json`. The available built-in image generator was used; it did not expose an Imagen 2.5 model selector. `public/art/` contains compressed WebP derivatives. No video is used for gameplay or attacks.
 
 The 3D engine loads separately from the interface. Deep module imports, instanced masonry/vegetation, a capped device pixel ratio, bounded physics bodies, hidden-tab suspension and a lower-shadow performance setting control rendering costs. Reduced-motion preferences skip automatic siege replays. Audio starts only after a user's sound toggle.
+
+### Mobile controls and verification
+
+The layout follows the dynamic viewport and device safe areas. Compact touch layouts use 44px primary controls, a collapsible visitors panel, scrollable cards and a side-mounted order dock in short landscape viewports. The guide scrolls independently with its close button kept visible. Form fields use 16px text to avoid focus zoom on iOS. Touch devices default to Performance graphics; explicit graphics and sound choices persist when browser storage is available.
+
+Drag the scene to orbit, pinch to zoom, or use the camera buttons. Before settling, tap a clearing or its card to move the Borg Meister. Pointer tracking prevents orbiting, pinching and cancelled touches from also selecting a plot. `check:controls` exercises those gesture boundaries.
+
+Verified on 22 September 2026 in desktop Safari's responsive mode at 375×667 and 667×375: choose land, settle, build the guide's three purchases, end turn, attack and scroll the English guide. Chromium viewport checks also cover 390×664, 844×390 and 375×548, including the visitors panel and Havok initialization. These are browser and viewport checks; physical iPhone touch gestures, sustained performance and thermal behaviour have not been measured.
 
 Useful primary references: [Babylon.js](https://www.babylonjs.com/), [Havok integration](https://github.com/BabylonJS/havok), [Babylon physics documentation](https://doc.babylonjs.com/features/featuresDeepDive/physics/).
 

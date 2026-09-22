@@ -83,6 +83,7 @@ import {
   type Battle,
 } from "@/lib/game";
 import type { WorldCommand } from "./world";
+import PlayerGuide from "./player-guide";
 const World = dynamic(() => import("./world"), {
   ssr: false,
   loading: () => (
@@ -257,6 +258,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   const [copied, setCopied] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
   const [quality, setQuality] = useState<"high" | "low">("high");
+  const [showMobileGuests, setShowMobileGuests] = useState(false);
   const [command, setCommand] = useState<WorldCommand | null>(null);
   const [battle, setBattle] = useState<Battle | null>(null);
   const [seconds, setSeconds] = useState(90);
@@ -327,7 +329,16 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   );
   useEffect(() => {
     setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    setSoundOn(localStorage.getItem("castle-sound") === "on");
+    const touchDevice = window.matchMedia("(pointer: coarse)").matches;
+    let preferredQuality: "high" | "low" = touchDevice ? "low" : "high";
+    try {
+      setSoundOn(localStorage.getItem("castle-sound") === "on");
+      const saved = localStorage.getItem("castle-quality");
+      if (saved === "low" || saved === "high") preferredQuality = saved;
+    } catch {
+      /* The game remains playable when browser storage is unavailable. */
+    }
+    setQuality(preferredQuality);
     if (signedIn) void load(true);
     else {
       displayGame(createGame(), true);
@@ -500,7 +511,11 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   function toggleSound() {
     const v = !soundOn;
     setSoundOn(v);
-    localStorage.setItem("castle-sound", v ? "on" : "off");
+    try {
+      localStorage.setItem("castle-sound", v ? "on" : "off");
+    } catch {
+      /* Sound still works when preferences cannot be stored. */
+    }
     sound("click", v);
   }
   async function copyInvite() {
@@ -569,7 +584,9 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
       selectedGuest)
     : null;
   return (
-    <main className={`game-shell ${battle ? "is-battling" : ""}`}>
+    <main
+      className={`game-shell ${battle ? "is-battling" : ""} ${settling ? "is-settling" : ""} ${showMobileGuests ? "guests-open" : ""}`}
+    >
       <Toaster position="top-center" theme="dark" closeButton richColors />
       <header className="topbar">
         <a className="brand" href="/" aria-label="Castle Chaos home">
@@ -803,8 +820,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
             ))}
           </div>
           <button className="how-to" onClick={() => setDialog("help")}>
-            <HelpCircle size={15} /> A ruler’s field guide{" "}
-            <ArrowUpRight size={13} />
+            <HelpCircle size={15} /> How to play <ArrowUpRight size={13} />
           </button>
         </aside>
         <div className="center-world">
@@ -812,7 +828,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
             <div className="location-plaque">
               <Footprints size={16} />
               <span>{CLEARINGS[selection].name}</span>
-              <small>Click a clearing to wander over</small>
+              <small>Tap a clearing to wander over</small>
             </div>
           ) : (
             !inLobby && (
@@ -900,11 +916,24 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
           {!battle && (
             <div className="world-hint">
               <span>DRAG TO ORBIT</span>
-              <i /> <span>SCROLL TO EXPLORE</span>
+              <i /> <span>PINCH OR SCROLL TO ZOOM</span>
             </div>
           )}
         </div>
-        <aside className="right-rail">
+        {!settling && !inLobby && (
+          <button
+            className="mobile-guests-toggle"
+            aria-expanded={showMobileGuests}
+            aria-controls="visitors-panel"
+            onClick={() => setShowMobileGuests((v) => !v)}
+          >
+            {showMobileGuests ? <X size={17} /> : <Footprints size={17} />}
+            {showMobileGuests
+              ? "Close guests"
+              : `Guests (${game.visitors.length})`}
+          </button>
+        )}
+        <aside className="right-rail" id="visitors-panel">
           {settling ? (
             <section className="arrival-panel framed">
               <span className="chapter">
@@ -1410,7 +1439,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
           </span>
           <button onClick={() => setDialog("help")}>
             <HelpCircle size={13} />
-            Field guide
+            How to play
           </button>
         </footer>
       </section>
@@ -1431,7 +1460,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
         }}
       >
         <DialogContent
-          className={`royal-dialog ${dialog === "court" || dialog === "chronicle" ? "wide-dialog" : ""}`}
+          className={`royal-dialog ${dialog === "court" || dialog === "chronicle" || dialog === "help" ? "wide-dialog" : ""} ${dialog === "help" ? "guide-dialog" : ""}`}
         >
           <DialogTitle className="dialog-title">
             {dialog === "online"
@@ -1751,9 +1780,15 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
                 </span>
                 <button
                   className="outline-button"
-                  onClick={() =>
-                    setQuality((q) => (q === "high" ? "low" : "high"))
-                  }
+                  onClick={() => {
+                    const next = quality === "high" ? "low" : "high";
+                    setQuality(next);
+                    try {
+                      localStorage.setItem("castle-quality", next);
+                    } catch {
+                      /* Optional preference. */
+                    }
+                  }}
                 >
                   {quality === "high" ? "High" : "Performance"}
                 </button>
@@ -1843,69 +1878,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
               {onlineError && <p className="form-error">{onlineError}</p>}
             </div>
           )}
-          {dialog === "help" && (
-            <div className="field-guide">
-              <section>
-                <Tent />
-                <div>
-                  <h3>01 · Fall. Wander. Settle.</h3>
-                  <p>
-                    Select a clearing in your starting land. Your Borg Meister
-                    walks there. Settle once to pitch a shelter: meadow gives
-                    +15 morale, ridge +40 health, grove +50 timber.
-                  </p>
-                </div>
-              </section>
-              <section>
-                <Hammer />
-                <div>
-                  <h3>02 · Make yourself a problem.</h3>
-                  <p>
-                    You have three orders each turn. Build a timber hall,
-                    workshop and siege engine. Upgrade to a stone keep and
-                    citadel. A quarry improves income; ramparts absorb damage.
-                    Repair from royal preferences.
-                  </p>
-                </div>
-              </section>
-              <section>
-                <Users />
-                <div>
-                  <h3>03 · Cultivate questionable company.</h3>
-                  <p>
-                    Recruit guests for passive perks or send them on sabotage
-                    quests. Low loyalty and a rival’s fine tavern tempt them to
-                    defect and reveal your weaknesses. Feed them occasionally.
-                  </p>
-                </div>
-              </section>
-              <section>
-                <Swords />
-                <div>
-                  <h3>04 · Deliver your regards.</h3>
-                  <p>
-                    Choose a rival and weapon under Make trouble. Weather
-                    changes boulder damage; hex mortars ignore half the armour.
-                    Each shot spends ammunition and one order. Your crews can
-                    fire once per turn. End your turn to pass play and collect
-                    income on your next turn.
-                  </p>
-                </div>
-              </section>
-              <section>
-                <Crown />
-                <div>
-                  <h3>05 · Keep your crown.</h3>
-                  <p>
-                    The last castle standing wins. At the end of round 30, the
-                    highest score wins: remaining health + one quarter of gold +
-                    50 per guest. Multiplayer turns last 90 seconds; the council
-                    passes absent rulers.
-                  </p>
-                </div>
-              </section>
-            </div>
-          )}
+          {dialog === "help" && <PlayerGuide />}
         </DialogContent>
       </Dialog>
       <Dialog

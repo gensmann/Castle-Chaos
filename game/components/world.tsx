@@ -4,6 +4,7 @@ import HavokPhysics from "@babylonjs/havok";
 import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 import type { Game, Battle, Player, Building, Weapon } from "@/lib/game";
 import { HOME_POSITIONS, CLEARINGS, positionOf } from "@/lib/game";
+import { createTapTracker } from "@/lib/pointer-tap";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
@@ -92,7 +93,8 @@ function createWorld(
     new Vector3(-17, 2, -12),
     scene,
   );
-  camera.attachControl(canvas, true);
+  camera.attachControl(canvas, false);
+  camera.useNaturalPinchZoom = true;
   camera.lowerRadiusLimit = 17;
   camera.upperRadiusLimit = 105;
   camera.lowerBetaLimit = 0.35;
@@ -1517,14 +1519,23 @@ function createWorld(
     cameraGoal = Vector3.Center(start, end).add(new Vector3(0, 2, 0));
     radiusGoal = Math.min(65, Vector3.Distance(start, end) * 1.05 + 12);
   }
-  let down = { x: 0, y: 0 };
+  const taps = createTapTracker();
   const onDown = (e: PointerEvent) => {
-    down = { x: e.clientX, y: e.clientY };
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    taps.down(e.pointerId, e.clientX, e.clientY);
+    // Touch takes over immediately from a camera-button transition.
+    if (!battleState) {
+      cameraGoal = null;
+      radiusGoal = null;
+    }
   };
+  const onMove = (e: PointerEvent) =>
+    taps.move(e.pointerId, e.clientX, e.clientY);
+  const onCancel = (e: PointerEvent) => taps.cancel(e.pointerId);
   const onUp = (e: PointerEvent) => {
-    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 7 || battleState)
-      return;
-    const picked = scene.pick(scene.pointerX, scene.pointerY);
+    if (!taps.up(e.pointerId, e.clientX, e.clientY) || battleState) return;
+    const rect = canvas.getBoundingClientRect();
+    const picked = scene.pick(e.clientX - rect.left, e.clientY - rect.top);
     if (!picked?.hit) return;
     const meta = picked.pickedMesh?.metadata;
     if (meta?.plot !== undefined) {
@@ -1552,7 +1563,10 @@ function createWorld(
     }
   };
   canvas.addEventListener("pointerdown", onDown);
-  canvas.addEventListener("pointerup", onUp);
+  canvas.addEventListener("pointermove", onMove);
+  canvas.addEventListener("pointercancel", onCancel);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("blur", taps.reset);
   const resize = () => engine.resize();
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
@@ -1680,7 +1694,10 @@ function createWorld(
       disposed = true;
       observer.disconnect();
       canvas.removeEventListener("pointerdown", onDown);
-      canvas.removeEventListener("pointerup", onUp);
+      canvas.removeEventListener("pointermove", onMove);
+      canvas.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("blur", taps.reset);
       engine.stopRenderLoop();
       physicalRubble.forEach((r) => r.aggregate?.dispose());
       staticColliders.forEach((c) => c.aggregate.dispose());
@@ -1723,7 +1740,7 @@ export default function World(props: Props) {
     <div className="world">
       <canvas
         ref={canvas}
-        aria-label="Interactive 3D kingdom. Drag to orbit, scroll to zoom; select clearings or rival castles."
+        aria-label="Interactive 3D kingdom. Drag to orbit, pinch or scroll to zoom; tap clearings or rival castles. Camera buttons are also available."
         tabIndex={0}
       />
       {!loaded && !error && (

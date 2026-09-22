@@ -3833,3 +3833,845 @@ a {
     font-size: 25px;
   }
 }
+
+/* The viewport follows Safari's browser bars and leaves room for the home indicator. */
+.game-shell {
+  height: 100dvh;
+  min-height: 0;
+  position: relative;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.mobile-guests-toggle {
+  display: none;
+}
+.build-grid,
+.weapon-grid {
+  overscroll-behavior-x: contain;
+}
+.royal-input,
+.attack-target select {
+  font-size: 16px;
+}
+.royal-dialog[data-slot="dialog-content"] {
+  max-height: calc(
+    100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px
+  );
+  overscroll-behavior: contain;
+}
+.royal-dialog [data-slot="dialog-close"] {
+  width: 44px;
+  height: 44px;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  background: #243122;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  opacity: 1;
+  z-index: 2;
+}
+.royal-dialog .dialog-title {
+  padding-right: 30px;
+}
+.guide-dialog[data-slot="dialog-content"] {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.guide-dialog > .dialog-title,
+.guide-dialog > .dialog-description {
+  flex-shrink: 0;
+}
+.guide-dialog > .player-guide {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 10px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.player-guide {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #cbd5bc;
+}
+.player-guide p {
+  margin: 0 0 14px;
+}
+.player-guide b,
+.player-guide strong {
+  color: #eee0b5;
+  font-weight: 600;
+}
+.player-guide h2 {
+  font: 500 27px/1.2 var(--serif);
+  color: #eedca7;
+  margin: 14px 0;
+}
+.player-guide h3 {
+  font: 500 21px/1.3 var(--serif);
+  color: #eedca7;
+  margin: 0 0 8px;
+}
+.player-guide ol,
+.player-guide ul {
+  padding-left: 24px;
+  margin: 16px 0;
+}
+.player-guide ol {
+  list-style: decimal;
+}
+.player-guide ul {
+  list-style: disc;
+}
+.player-guide li {
+  padding-left: 5px;
+  margin: 0 0 12px;
+}
+.player-guide li::marker {
+  color: #d6bc7e;
+  font-weight: bold;
+}
+.guide-quickstart {
+  padding: 22px;
+  border: 1px solid #a99b6555;
+  background: linear-gradient(125deg, #76834b25, #c4a65f0b);
+  border-radius: 5px;
+  margin: 8px 0 20px;
+}
+.guide-quickstart .eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.3px;
+}
+.player-guide .guide-aside {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-bottom: 0;
+  color: #b2c198;
+  font-style: italic;
+}
+.player-guide details {
+  border-bottom: 1px solid var(--line);
+}
+.player-guide summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 74px;
+  padding: 16px 4px;
+  list-style: none;
+  color: #e5d3a4;
+  font: 500 22px/1.2 var(--serif);
+}
+.player-guide summary::-webkit-details-marker {
+  display: none;
+}
+.player-guide summary::after {
+  content: "+";
+  margin-left: auto;
+  font: 22px var(--sans);
+}
+.player-guide details[open] > summary::after {
+  content: "−";
+}
+.player-guide summary > svg {
+  flex-shrink: 0;
+  color: #b7c98c;
+}
+.player-guide summary small {
+  display: block;
+  color: #a7b698;
+  font: 12px/1.5 var(--sans);
+  margin-top: 5px;
+}
+.player-guide summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+.guide-section {
+  padding: 0 4px 12px 37px;
+}
+.guide-controls {
+  margin: 0;
+}
+.guide-controls > div {
+  margin: 0 0 18px;
+}
+.guide-controls dt {
+  color: #e9dcb6;
+  font-weight: bold;
+}
+.guide-controls dd {
+  margin: 3px 0 0;
+}
+.guide-guests {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 18px 0;
+}
+.guide-guests section {
+  padding: 16px;
+  background: #0a150d40;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.guide-guests p {
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+.player-guide .guide-signoff {
+  text-align: center;
+  padding: 28px 0 10px;
+  color: #d6bc7e;
+  font: italic 19px var(--serif);
+}
+.guide-page {
+  height: 100dvh;
+  overflow-y: auto;
+  background: radial-gradient(ellipse at top, #3c4c32, #19271e 60%);
+  padding: max(24px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+}
+.guide-page-inner {
+  max-width: 760px;
+  margin: auto;
+}
+.guide-back {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  color: #d6bc7e;
+}
+.guide-page header {
+  padding: 32px 0 16px;
+}
+.guide-page header > svg {
+  display: block;
+  color: #d6bc7e;
+  margin-bottom: 22px;
+}
+.guide-page h1 {
+  font: 500 clamp(32px, 6vw, 48px)/1.12 var(--serif);
+  color: #eedca7;
+  margin: 14px 0;
+}
+.guide-page header > p {
+  color: #bac9a7;
+  line-height: 1.65;
+}
+
+@media (max-width: 620px), (max-height: 500px) and (max-width: 1100px) {
+  .game-shell {
+    min-height: 0;
+  }
+  .topbar {
+    height: 62px;
+    padding: 0 10px;
+    gap: 7px;
+  }
+  .brand {
+    width: auto;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .brand > svg {
+    width: 24px;
+    height: 30px;
+  }
+  .brand > span {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+  }
+  .brand b {
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+  .brand small,
+  .morale,
+  .sound-button,
+  .online-button > span {
+    display: none;
+  }
+  .treasury {
+    gap: 10px;
+    margin-left: auto;
+  }
+  .resource {
+    min-width: 0;
+    gap: 0;
+  }
+  .resource-icon {
+    display: none;
+  }
+  .resource b {
+    font-size: 17px;
+  }
+  .resource span:not(.resource-icon) {
+    font-size: 9px;
+  }
+  .resource em {
+    display: none;
+  }
+  .header-actions {
+    gap: 0;
+  }
+  .online-button,
+  .avatar-button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+  }
+  .online-button {
+    border: 0;
+    min-width: 0;
+  }
+  .avatar-button svg,
+  .online-button > svg {
+    width: 20px;
+    height: 20px;
+  }
+  .top-world-line,
+  .rival-list,
+  .rivals-label,
+  .how-to,
+  .whisper,
+  .world-hint {
+    display: none;
+  }
+  .left-rail {
+    top: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: 176px;
+    gap: 0;
+    pointer-events: none;
+  }
+  .stronghold-panel {
+    padding: 9px 11px;
+    background: #22341ed9;
+    pointer-events: auto;
+  }
+  .stronghold-panel > .eyebrow,
+  .crest,
+  .castle-stats,
+  .arrival-note {
+    display: none;
+  }
+  .stronghold-heading {
+    margin: 0;
+  }
+  .stronghold-heading h1 {
+    font-size: 16px;
+  }
+  .stronghold-heading p {
+    font-size: 10px;
+    margin-top: 3px;
+  }
+  .health {
+    margin: 7px 0 0;
+  }
+  .health-top {
+    font-size: 10px;
+    margin-bottom: 5px;
+  }
+  .health-top > span:first-child {
+    font-size: 9px;
+  }
+  .game-nav {
+    margin-top: auto;
+    display: flex;
+    width: max-content;
+    max-width: 100%;
+    padding: 0;
+    gap: 0;
+    flex-direction: row;
+    pointer-events: auto;
+  }
+  .game-nav button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+  .game-nav button > span,
+  .game-nav button > svg:last-child:not(:first-child) {
+    display: none;
+  }
+  .game-nav button > svg {
+    width: 18px;
+    height: 18px;
+  }
+  .center-world {
+    inset: 0;
+    justify-content: center;
+  }
+  .location-plaque {
+    display: none;
+  }
+  .right-rail {
+    display: none;
+  }
+  .mobile-guests-toggle {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 12px;
+    border: 1px solid #a59e6866;
+    border-radius: 4px;
+    background: #253521ef;
+    color: #e5d6ad;
+  }
+  .guests-open:not(.is-settling) .right-rail {
+    display: block;
+    position: absolute;
+    top: 58px;
+    right: 8px;
+    bottom: 8px;
+    width: min(250px, calc(100% - 24px));
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 6;
+  }
+  .guests-open .camera-controls {
+    visibility: hidden;
+  }
+  .guest-panel {
+    background: #22321ff7;
+  }
+  .panel-heading {
+    padding: 12px;
+  }
+  .panel-heading .eyebrow {
+    font-size: 10px;
+  }
+  .featured-portrait {
+    height: 140px;
+    width: calc(100% - 24px);
+    margin: 0 12px;
+  }
+  .guest-type {
+    font-size: 10px;
+  }
+  .guest-body {
+    padding: 14px 12px 4px;
+  }
+  .guest-body h2 {
+    font-size: 22px;
+  }
+  .guest-quote {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .guest-perk {
+    display: flex;
+    font-size: 12px;
+  }
+  .invite-button {
+    font-size: 13px;
+    min-height: 44px;
+  }
+  .guest-pagination {
+    margin-top: 4px;
+  }
+  .guest-pagination > button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+  }
+  .guest-pagination > span {
+    gap: 0;
+  }
+  .guest-pagination > span > button {
+    width: 30px;
+    height: 44px;
+    border-radius: 0;
+    background: radial-gradient(circle, #818b5e 3px, transparent 4px);
+  }
+  .guest-pagination > span > button.selected {
+    background: radial-gradient(circle, #e1c583 4px, transparent 5px);
+  }
+  .camera-controls {
+    right: 8px;
+    bottom: 8px;
+    display: grid;
+    grid-template-columns: 44px 44px;
+    padding: 0;
+  }
+  .camera-controls > button {
+    width: 44px;
+    height: 44px;
+  }
+  .camera-controls > button svg {
+    width: 18px;
+    height: 18px;
+  }
+  .camera-controls > span {
+    display: none;
+  }
+  .command-dock {
+    padding: 0 10px;
+    max-height: 57dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .dock-top {
+    min-height: 64px;
+    padding: 9px 0;
+    gap: 8px;
+  }
+  .turn-medallion {
+    display: none;
+  }
+  .turn-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .turn-info b {
+    font-size: 11px;
+    max-width: none;
+    line-height: 1.4;
+  }
+  .turn-info > div > span {
+    font-size: 8px;
+    letter-spacing: 0.6px;
+  }
+  .order-pips {
+    display: none;
+  }
+  .gold-button,
+  .outline-button {
+    min-height: 44px;
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  .end-turn {
+    min-width: 100px;
+  }
+  .dock-tabs [data-slot="tabs-list"] {
+    min-height: 44px;
+    padding: 0;
+    gap: 2px;
+  }
+  .dock-tabs [data-slot="tabs-trigger"] {
+    height: 44px;
+    padding: 0 6px;
+    font-size: 11px;
+    gap: 5px;
+  }
+  .dock-tabs svg {
+    width: 14px;
+    height: 14px;
+  }
+  .build-grid,
+  .weapon-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    scroll-snap-type: x proximity;
+    padding-bottom: 4px;
+  }
+  .build-card,
+  .weapon-grid .build-card {
+    flex: 0 0 215px;
+    min-height: 105px;
+    padding: 12px;
+    scroll-snap-align: start;
+  }
+  .build-content h3 {
+    font-size: 18px;
+  }
+  .build-content p {
+    font-size: 11px;
+  }
+  .card-overline {
+    font-size: 8px;
+  }
+  .cost {
+    font-size: 12px;
+  }
+  .dock-body {
+    min-height: 0;
+    padding-bottom: 8px;
+  }
+  .clearing-card {
+    padding: 10px 8px;
+    min-height: 110px;
+  }
+  .clearing-card h3 {
+    font-size: 14px;
+  }
+  .clearing-card p {
+    font-size: 10px;
+  }
+  .clearing-icon {
+    display: none;
+  }
+  .clearing-card .selection-mark {
+    position: static;
+    order: -1;
+  }
+  .clearing-card .card-overline {
+    display: none;
+  }
+  .dock-footer {
+    min-height: 44px;
+    height: auto;
+    gap: 10px;
+    font-size: 9px;
+  }
+  .dock-footer > span:first-child {
+    line-height: 1.4;
+  }
+  .dock-footer > button {
+    min-height: 44px;
+    padding: 0 4px;
+    font-size: 12px;
+    color: #dece9e;
+    flex-shrink: 0;
+    gap: 6px;
+  }
+  .dock-footer > button svg {
+    width: 16px;
+    height: 16px;
+  }
+  .footer-flavour {
+    display: none;
+  }
+  .attack-dock {
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 0;
+  }
+  .attack-target {
+    width: 100%;
+    display: flex;
+    gap: 7px;
+    align-items: center;
+  }
+  .attack-target .card-overline {
+    display: none;
+  }
+  .attack-target select {
+    min-height: 44px;
+    font-size: 16px;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .attack-target small {
+    font-size: 10px;
+    width: 95px;
+    flex-shrink: 0;
+  }
+  .attack-weapons {
+    min-width: 0;
+    gap: 5px;
+    flex-basis: 100%;
+  }
+  .attack-weapons > button {
+    min-height: 70px;
+    padding: 8px 4px;
+  }
+  .attack-weapons > button > span {
+    font-size: 11px;
+  }
+  .attack-weapons > button > small {
+    font-size: 9px;
+  }
+  .launch-block {
+    flex: 1 0 100%;
+    margin: 0;
+    gap: 8px;
+    justify-content: space-between;
+  }
+  .launch-block > span:first-child {
+    font-size: 23px;
+  }
+  .launch-block > span:first-child > small {
+    font-size: 10px;
+  }
+  .launch-block .cost {
+    display: none;
+  }
+  .launch-button {
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .is-battling .mobile-guests-toggle {
+    opacity: 0.13;
+    pointer-events: none;
+  }
+  .is-battling .battle-banner,
+  .battle-banner {
+    position: relative;
+    top: auto;
+    width: min(290px, calc(100% - 20px));
+    margin: 0;
+    min-width: 0;
+    padding: 12px;
+  }
+  .battle-banner > button {
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .is-battling .battle-banner > strong {
+    font-size: 25px;
+  }
+  .lobby-plaque,
+  .victory-panel {
+    position: relative;
+    top: auto;
+    width: min(300px, calc(100% - 24px));
+    min-width: 0;
+    max-height: calc(100% - 20px);
+    overflow-y: auto;
+    pointer-events: auto;
+  }
+  .royal-dialog[data-slot="dialog-content"] {
+    padding: 22px 18px;
+  }
+  .royal-dialog .dialog-title {
+    font-size: 26px;
+    padding-right: 32px;
+  }
+  .royal-dialog .dialog-description {
+    font-size: 13px;
+  }
+  .royal-input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .settings-content .outline-button {
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .guide-quickstart {
+    padding: 16px;
+  }
+  .player-guide {
+    font-size: 14px;
+  }
+  .player-guide h2 {
+    font-size: 25px;
+  }
+  .player-guide summary {
+    font-size: 21px;
+  }
+  .guide-section {
+    padding-left: 4px;
+  }
+  .guide-guests {
+    grid-template-columns: 1fr;
+  }
+  .guide-dialog > .player-guide {
+    padding-right: 6px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 1100px) {
+  .topbar {
+    height: 52px;
+  }
+  .world-stage {
+    margin-right: 306px;
+  }
+  .command-dock {
+    position: absolute;
+    top: calc(52px + env(safe-area-inset-top));
+    right: env(safe-area-inset-right);
+    bottom: env(safe-area-inset-bottom);
+    width: 306px;
+    max-height: none;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    padding: 0 10px;
+  }
+  .dock-top {
+    min-height: 60px;
+    padding: 8px 0;
+  }
+  .dock-tabs [data-slot="tabs-trigger"] {
+    font-size: 10px;
+    gap: 3px;
+    padding: 0 4px;
+  }
+  .dock-tabs svg {
+    display: none;
+  }
+  .build-card,
+  .weapon-grid .build-card {
+    flex-basis: 240px;
+  }
+  .clearing-options {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+  }
+  .clearing-card {
+    flex: 0 0 170px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .clearing-card p {
+    max-width: none;
+  }
+  .left-rail {
+    width: 176px;
+  }
+  .stronghold-panel {
+    padding: 8px 10px;
+  }
+  .mobile-guests-toggle {
+    font-size: 11px;
+    padding: 0 10px;
+  }
+  .guide-dialog .dialog-description {
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 620px), (max-height: 500px) and (max-width: 1100px) {
+  .is-battling .battle-banner {
+    position: absolute;
+    top: 8px;
+    width: min(360px, calc(100% - 24px));
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 10px;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .is-battling .battle-banner > span {
+    grid-column: 1 / -1;
+  }
+  .is-battling .battle-banner > strong {
+    margin: 4px 0;
+    align-self: center;
+  }
+  .is-battling .battle-banner p {
+    display: none;
+  }
+  .is-battling .battle-banner > button {
+    margin: 0;
+    padding: 0 4px;
+  }
+}
