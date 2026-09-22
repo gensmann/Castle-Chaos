@@ -60,6 +60,8 @@ Useful primary references: [Babylon.js](https://www.babylonjs.com/), [Havok inte
 
 This project is attached to Sites ID `appgprj_6ab29b89b1ec819180544a0a53115f5d` in `.openai/hosting.json`. Reuse it; do not create a duplicate. The requested audience is public.
 
-Publish the exact source commit to the site's source repository, build that commit, archive the **contents of `dist/`** (including `dist/.openai/hosting.json` and copied migrations), save a Sites version with that commit SHA, then deploy the saved version and check its terminal status. Keep source credentials in process memory/stdin only. Never put them in Git remotes, files, shell arguments, logs or the public bundle.
+Publish the exact source commit to the site's source repository, build that commit, archive `dist/` together with a top-level `.openai/` directory copied from `dist/.openai/` (hosting configuration and generated migrations), save a Sites version with that commit SHA, then deploy the saved version and check its terminal status. Keep source credentials in process memory/stdin only. Never put them in Git remotes, files, shell arguments, logs or the public bundle.
 
 `npm run build` produces `dist/server/index.js`, the client assets, and `.openai` hosting/migration metadata. The platform supplies production bindings and applies the packaged migrations. `npm start` is local preview only and never deploys.
+
+The outer development repository keeps the application in `game/`. Its Sites source branch, `codex/sites-source`, contains that directory at the repository root; its tree must match the development commit’s `game` tree. Future source publications must retain the Sites branch’s previous commit as their parent.
