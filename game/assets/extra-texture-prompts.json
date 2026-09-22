@@ -1,0 +1,15 @@
+{
+  "generator": "Built-in image_gen; one generation per asset, no variants.",
+  "assets": [
+    {
+      "name": "ground-meadow.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: seamless tileable square albedo/base-color texture for a real-time 3D medieval woodland meadow ground, in a colourful humorous fantasy game for adults.\nPrimary request: densely detailed small leafy grass with moss, clover tufts and irregular patches of exposed dark earth. Tiny individual blades and leaves at micro scale. Rich natural subdued olive and fern greens, with enough green color depth to enliven a fantasy woodland valley while remaining physically plausible. A fine-grained consistent scale across the full texture, many hundreds of small leaves and blades, no single large focal object.\nStyle/medium: premium hand-painted 3D fantasy game material with tactile believable surface detail; painterly restraint rather than stylized flat icons.\nComposition/framing: square, seamless repeat on all four edges, perfectly overhead top-down texture. Dense ground cover extends all the way to the edges. Neutral flat illumination for an albedo map; no directional lighting, no cast shadows, no vignette.\nAvoid: big rocks, stones, trees, trunks, flowers, big objects, paths, large bare areas, perspective, neon colors, washed-out yellow coloration, illustrations of a landscape, text, logos, watermarks, UI.",
+      "path": "/Users/oscar/.codex/generated_images/01a0c9ae-d5ba-7380-af65-94e274a6a355/exec-8e49571a-7766-4262-b5e6-a5b1310c0946.png"
+    },
+    {
+      "name": "roof-copper.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: seamless tileable square albedo/base-color texture for old fantasy castle roof shingles in a colourful premium real-time 3D medieval game for adults.\nPrimary request: densely detailed irregular small overlapping beveled roof tiles made from old verdigris copper, with the chunky handmade character of slate shingles. The dominant colors are deep teal, turquoise and copper-green, with restrained little hints of dark orange copper patina and fine realistic oxidation speckles. Many small tiles arranged in staggered horizontal courses, subtle variation in shape and color, worn edges and fine scratches. Rich, carefully controlled color, visibly tactile medieval craftsmanship.\nStyle/medium: refined hand-painted physically plausible 3D fantasy game material, premium and adult-facing, believable material color with gentle stylization.\nComposition/framing: square flat front-on orthographic texture, seamless repeat on all four edges, shingle courses extend fully to every edge. Dense small-scale detail, no one prominent tile. Neutral flat light appropriate for an albedo map, bevels suggested only by fine edge color variation.\nAvoid: perspective, a complete roof silhouette, building, sky, large cast shadows, directional lighting, large black gaps, vignette, objects, neon, text, logos, watermarks, UI.",
+      "path": "/Users/oscar/.codex/generated_images/01a0c9ae-d5ba-7380-af65-94e274a6a355/exec-a53c1782-b7d6-455a-8f29-4faca72deb6a.png"
+    }
+  ]
+}

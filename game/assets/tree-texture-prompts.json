@@ -1,0 +1,45 @@
+{
+  "generator": "Built-in image_gen tool; one generation per asset, no variants.",
+  "assets": [
+    {
+      "name": "tree-bark.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: seamless square albedo/base-color texture for mature oak tree trunks in a colourful whimsical medieval 3D fantasy game for adults.\nPrimary request: weathered mature oak bark with long irregular vertical ridges and narrow branching cracks, broken knobbly plates and tactile deep grain. Warm grey-umber bark, gentle muted brown variations, small rich moss-green patches tucked into cracks. Dense convincing small-scale bark detail, hand-crafted stylized character, quietly magical woodland material without symbols or ornament.\nStyle/medium: premium painterly 3D digital fantasy game material, physically plausible texture color with restrained stylization, not a photograph.\nComposition/framing: square seamless tile, perfectly flat front-on albedo swatch. Bark ridges oriented vertically from top edge to bottom edge. Uniform scale across the image, no central focal point, all four edges must repeat seamlessly.\nLighting: evenly lit diffuse albedo only, no directional light, no specular glints, no baked cast shadows, no dark vignette, no ambient shading gradient.\nAvoid: entire tree trunks, branches, leaves, sky, landscape, faces, knots shaped as eyes, objects, text, watermarks, logos, photo texture scan look.",
+      "path": "/Users/oscar/.codex/generated_images/01a0c9ae-d5ba-7380-af65-94e274a6a355/exec-9213e29d-b03b-42c3-8773-3cd830267324.png",
+      "master": "assets/masters/tree-bark.png",
+      "runtime": "public/art/tree-bark.webp",
+      "inspected": true,
+      "notes": "Visually inspected for subject, colour, coverage and unwanted objects. Seamless tiling requested; exact edge continuity not measured.",
+      "optimization": {
+        "format": "webp",
+        "quality": 84,
+        "effort": 6,
+        "smartSubsample": true,
+        "resize": {
+          "width": 768,
+          "height": 768
+        }
+      },
+      "webBytes": 227660
+    },
+    {
+      "name": "tree-leaves.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: seamless square foliage surface albedo texture to wrap over solid 3D tree canopy meshes in a colourful whimsical medieval fantasy game for adults.\nPrimary request: a continuous dense canopy surface made of many overlapping medium-small oak and beech leaves, filling every part of the frame. Varied organic leaf shapes: gently lobed oak leaves and smooth pointed oval beech leaves, fine stems and subtly painted veins. Rich dark forest green, olive green and moss green, with only a few warm golden leaves scattered among the greens. Dense small-scale detail, believable leafy forms, controlled color variation and a cohesive softly painted fantasy feel.\nStyle/medium: premium painterly 3D digital game texture; visibly hand-painted shapes and softly simplified material detail, never photorealistic or a photograph.\nComposition/framing: square seamless repeat on all four edges, flat orthographic surface viewed straight-on, uniform dense coverage and scale. The leaves overlap edge-to-edge across the whole image. No holes or sky visible anywhere, no central focal subject, no branches.\nLighting: flat diffuse albedo-only color, leaf volume suggested with gentle local color shifts, no baked cast shadows, no hard highlights, no directional lighting, no vignette.\nAvoid: whole tree silhouette, branches, large twigs, sky, transparent gaps, flowers, fruit, insects, people, landscapes, text, lettering, logos, watermarks.",
+      "path": "/Users/oscar/.codex/generated_images/01a0c9ae-d5ba-7380-af65-94e274a6a355/exec-e17b55af-d123-453d-9d56-8e8da1c6a32c.png",
+      "master": "assets/masters/tree-leaves.png",
+      "runtime": "public/art/tree-leaves.webp",
+      "inspected": true,
+      "notes": "Visually inspected for subject, colour, coverage and unwanted objects. Seamless tiling requested; exact edge continuity not measured.",
+      "optimization": {
+        "format": "webp",
+        "quality": 84,
+        "effort": 6,
+        "smartSubsample": true,
+        "resize": {
+          "width": 1024,
+          "height": 1024
+        }
+      },
+      "webBytes": 173354
+    }
+  ]
+}

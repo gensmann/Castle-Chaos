@@ -1,0 +1,25 @@
+{
+  "generator": "Built-in image_gen tool; one generation, no variants.",
+  "assets": [
+    {
+      "name": "fieldstone.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: seamless square albedo/base-color texture for the continuous surface of natural terrain boulders in a colourful mature medieval 3D fantasy game.\nPrimary request: weathered natural granite / fieldstone surface, fine mineral grain with softly mottled sage-grey coloration and restrained small patches of olive lichen. Dense small-scale irregular mineral flecks in muted grey, warm grey, sage and grey-umber, subtle believable stone coloration and weathering. The entire image shows a single continuous rock surface, no individual stones or assembled blocks.\nStyle/medium: premium mature painterly fantasy 3D game material, hand-painted digital texture with physically plausible natural stone color, tactile detail and restrained stylization; not photorealistic.\nComposition/framing: square, perfectly flat front-on orthographic texture, uniform fine-grained scale and detail throughout, seamless repeat on all four edges. No central focal point or large identifiable mark.\nLighting: albedo only, completely flat even diffuse illumination, no directional shading, cast shadows, specular highlights, baked ambient occlusion or vignette.\nAvoid: masonry courses, mortar, cobblestones, assembled stone blocks, separate pebbles, an entire boulder silhouette, mountains, landscape, strong cracks, deep crevices, strong shadows, wet gloss, metallic shine, text, logos, UI, watermarks.",
+      "path": "/Users/oscar/.codex/generated_images/01a0c9ae-d5ba-7380-af65-94e274a6a355/exec-8e0b5563-9809-4e1c-801a-48cfac75e6a1.png",
+      "master": "assets/masters/fieldstone.png",
+      "runtime": "public/art/fieldstone.webp",
+      "optimization": {
+        "format": "webp",
+        "quality": 84,
+        "effort": 6,
+        "smartSubsample": true,
+        "resize": {
+          "width": 768,
+          "height": 768
+        }
+      },
+      "inspected": true,
+      "notes": "Continuous fine-grained mottled granite surface with restrained olive lichen; no masonry, objects, strong cracks or cast shadows. Seamless tiling requested; exact edge continuity not measured.",
+      "webBytes": 330858
+    }
+  ]
+}
