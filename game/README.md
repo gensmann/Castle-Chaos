@@ -22,6 +22,7 @@ npm run typecheck
 npm run check:rules
 npm run check:controls
 npm run check:audio
+npm run check:physics
 # Requires the production Worker running locally on port 8787:
 npm run check:api
 ```
@@ -42,9 +43,12 @@ Open **How to play** in the game, or read the shareable English guide at `/guide
 
 ## Architecture
 
-**Babylon.js + Havok** was selected for its integrated browser renderer, camera controls, GPU instancing, lighting, shadows, and rigid-body physics. Babylon is a complete game-oriented engine; it fits this procedural, destructible 3D world better than assembling a renderer and physics bridge separately. The current renderer uses WebGL2 for broad browser support.
+**PixiJS 8** renders an isometric 2D world with WebGL. Babylon.js and Havok have been removed. The camera, sprite animation and lightweight debris simulation run independently of the authoritative game rules.
 
-- `components/world.tsx`: procedural island, shelter/castle growth, isometric camera, ballistic projectiles and destruction. Real masonry instances detach into Havok rigid bodies. Gravity, off-centre impulses, mass, friction and collision shapes govern debris motion. Nearby surviving structures and the terrain receive collisions. Active debris is bounded for predictable performance; settled pieces retain their visual mesh.
+- `components/world.tsx`: React lifecycle and error/retry handling for the renderer.
+- `components/pixi-world.ts`: depth-sorted scenery, castle progression, character movement, projectiles, picking, LOD and scene disposal.
+- `components/pixi-art.ts`: atlas frames, a cached painted terrain texture and shared isometric masonry shapes.
+- `lib/debris-physics.ts`: bounded fixed-step 2.5D debris, gravity, damped bounces, simple building/ground contacts and sphere contacts between fragments. This deliberately replaces Havok's general rigid-body solver with a small visual simulation; it does not model angular inertia or structural stresses.
 - `components/game-client.tsx`: responsive game interface, guest portraits, sound synthesis, turn controls, room invitations and reconnection.
 - `lib/game.ts`: shared, deterministic rule evaluation, seeded defection rolls, bot decisions and victory logic.
 - `app/api/game/route.ts`: authenticated, authoritative multiplayer commands. D1 revisions enforce compare-and-swap writes. Receipt IDs make resubmitted orders idempotent. A profile points to one active realm. Enemy resources and guest loyalty remain hidden unless compromised; the RNG state is never exposed.
@@ -56,23 +60,17 @@ Multiplayer synchronizes authoritative outcomes through short polling (2.5–4 s
 
 Generated source art and exact generation prompts are in `assets/masters/`, `assets/art-prompts.json`, and `assets/extra-texture-prompts.json`. The available built-in image generator was used; it did not expose an Imagen 2.5 model selector. `public/art/` contains compressed WebP derivatives. No video is used for gameplay or attacks.
 
-The renderer uses a fixed orthographic camera at 45° azimuth and 35.264° elevation. `components/isometric-camera.ts` handles mouse/touch panning, cursor-anchored wheel/pinch zoom, keyboard navigation and aspect-aware framing of the entire realm or a siege trajectory. Overview temporarily clears side panels so castle labels remain usable. The camera angle cannot drift while focusing or resizing.
+The renderer uses a fixed isometric projection. `components/isometric-camera.ts` handles mouse/touch panning, cursor-anchored wheel/pinch zoom, keyboard navigation and aspect-aware framing of the realm or a siege trajectory. Overview clears side panels so castle labels remain usable.
 
-Trees, rocks, cottages, workshops, taverns and keeps use original painted sprites from one 496 KB transparent WebP atlas. `components/world-sprites.ts` gives each prop two triangles with alpha-tested depth, batches forest instances by species and shares the texture with building cards. The lossless master and exact generation prompt are in `assets/masters/isometric-village-atlas.png` and `assets/isometric-sprites.json`. Simple invisible building volumes preserve rubble collisions. Ramparts, siege engines and rubble retain real geometry; sprite facades do not individually fracture like rampart blocks.
+Trees, rocks, cottages, workshops, taverns and keeps share the original 496 KB transparent village atlas. `components/character-sprites.ts` provides four-frame king and porter walks and a four-frame hammer animation from a shared 305 KB atlas. Walk phase follows distance travelled; facing mirrors left/right. Original masters and generation prompts remain in `assets/masters/` and the sprite JSON files. No new art download is needed for the engine migration.
 
-`components/character-sprites.ts` replaces the articulated human meshes with two-triangle painted sprites: four-frame king and porter walks, plus a four-frame hammer animation. One 305 KB alpha-tested atlas is shared by all characters; UVs update only when the frame or mirrored facing changes. Walk phase follows distance travelled and frames face left/right (not eight independent directions). The lossless master and exact built-in imagegen prompt are in `assets/masters/isometric-characters.png` and `assets/character-sprites.json`.
+A seeded terrain canvas is drawn once and uploaded as one background texture. Masonry uses shared 2D Graphics shapes; individual pieces detach at impact. Invisible box colliders preserve building contacts. Decorative workers, chimney smoke, flags, ripples and birds animate independently of resource rules. Props and characters are sorted by their ground position for isometric overlap.
 
-`components/world-life.ts` supplies carrying villagers, workshop hammering, chimney smoke and birds. Workers are decorative and do not alter resource rules. Flags deform, siege axles release and reset, and the river animates analytically without a reflection render pass. Static castle decoration is merged and its world matrices are frozen. Animation handles and disposed emitters are pruned after rebuilding.
+Performance graphics default to one device pixel per CSS pixel, sparse scenery, simpler masonry and 30 fps at rest. Camera motion, landing, attacks and moving rubble can use 60 fps. High adds denser scenery, finer masonry and up to 1.6 device pixels per CSS pixel at 60 fps. Hidden pages stop rendering. Settled rubble stops simulation. Active debris is capped at 60/100 fragments for Performance/High. Reduced motion disables ambient animation and automatic siege replays.
 
-Performance graphics are the default: at most one device pixel per CSS pixel, simpler terrain and masonry, sparse scenery, no glow pass, lower shadow filtering and a shadow refresh every four frames outside physics. Quiet gameplay caps rendering at 30 fps; camera transitions and sieges may use up to 60. High adds denser scenery, finer masonry, glow and up to 1.6 device pixels per CSS pixel, capped at 60 fps. Explicit user graphics choices persist. Havok only simulates while rubble is active, pauses once pieces settle, and is reused across quality changes. Hidden pages skip rendering. Reduced-motion preferences stop ambient movement and automatic siege replays. Audio shares one context and starts only after an enabled user gesture.
+LOD follows projected size (viewport height / camera span), with hysteresis around thresholds. Near detail includes flowers, birds and smoke with up to 12 character frame changes per second. Middle reduces decoration and character animation to 6 changes per second. Far hides workers, smoke and small trim, retaining castles, selection and an idle king. Offscreen characters skip frame updates. Gameplay continues independently of visual detail.
 
-LOD follows projected size (viewport height / orthographic span), because camera distance alone does not change size in this projection. Near detail retains grass, flowers, birds and smoke with up to 12 sprite frame updates per second; middle detail removes tiny scenery, reduces smoke and uses up to 6 sprite updates per second; far detail hides decorative workers, smoke and merged castle trim while retaining buildings, ramparts, selection and physics. The king remains visible with an idle frame. Hysteresis prevents detail flicker around zoom thresholds. Offscreen characters skip animation uploads; movement and gameplay continue independently. Texture mipmaps reduce texture detail automatically.
-
-Character/LOD verification on 26 September 2026 covered all three zoom tiers and returning to close view, clean production startup, clearing selection, settlement, and rebuilding a hall/workshop with the sprite workers. Typecheck, lint, production build and the control checks passed; control checks include LOD hysteresis and offscreen bounds. This is functional browser verification, not a measured GPU or battery benchmark.
-
-The canvas exposes `data-lod`, `data-characters`, `data-projection`, `data-camera-angles`, `data-camera-target`, `data-view-span`, `data-frame-budget`, `data-fps`, `data-active-meshes`, `data-quality` and `data-physics` for lightweight diagnostics. These are current samples, not hardware benchmarks.
-
-The sprite build was checked in the local production Worker on 26 September 2026: settlement, timber hall and workshop construction, trebuchet crafting and firing, Havok rubble, return to the 30 fps idle cap, and High/Performance switching without console errors or warnings. Isometric pan, zoom and overview framing were also checked at 390×844 and 844×390 browser viewports.
+The canvas exposes `data-engine`, `data-renderer`, `data-lod`, `data-characters`, `data-projection`, `data-camera-target`, `data-view-span`, `data-frame-budget`, `data-fps`, `data-active-sprites`, `data-rubble`, `data-quality` and `data-physics`. These are current samples, not hardware benchmarks.
 
 ### Sound effects
 
@@ -86,11 +84,11 @@ The layout follows the dynamic viewport and device safe areas. Compact touch lay
 
 Drag the map to pan, pinch to zoom, or use the camera buttons and arrow keys. Before settling, tap a clearing or its card to move the Borg Meister. Pointer tracking prevents panning, pinching and cancelled touches from also selecting a plot. `check:controls` exercises those gesture boundaries.
 
-Verified on 22 September 2026 in desktop Safari's responsive mode at 375×667 and 667×375: choose land, settle, build the guide's three purchases, end turn, attack and scroll the English guide. Chromium viewport checks also cover 390×664, 844×390 and 375×548, including the visitors panel and Havok initialization. These are browser and viewport checks; physical iPhone touch gestures, sustained performance and thermal behaviour have not been measured.
+The control checks exercise taps, drag/pinch cancellation, projection, aspect-aware framing, LOD hysteresis and offscreen bounds. The physics check covers gravity, bounce, sleep, wall/roof contacts and fragment collisions. Browser viewport checks do not establish performance on physical phones or a multiplayer load benchmark.
 
-Verified again on 26 September 2026 in the local production Worker: cold 3D/Havok initialization, settlement, timber hall and quarry construction, stone-keep upgrade, bot attacks and rubble, weather transitions, and camera controls. Development-browser checks also covered a player siege, overview labels, High/Performance switching, and portrait/landscape mobile layouts. These checks do not establish performance on physical phones or a multiplayer load benchmark.
+PixiJS migration verified on 26 September 2026 in the local production Worker: fresh startup, direct clearing and rival-sprite picking, drag without changing selection, settlement, hall/workshop construction, trebuchet firing with sound and 18 debris fragments, return to 30 fps idle, High/Performance switching, and portrait/landscape layouts at 390×844 and 844×390. Near/middle/far LOD diagnostics were observed. No console errors or warnings were captured in these flows. Physical-device GPU/battery performance and subjective sound quality were not measured.
 
-Useful primary references: [Babylon.js](https://www.babylonjs.com/), [Havok integration](https://github.com/BabylonJS/havok), [Babylon physics documentation](https://doc.babylonjs.com/features/featuresDeepDive/physics/).
+Primary reference: [PixiJS application and renderer](https://pixijs.com/8.x/guides/components/application).
 
 ## Sites deployment
 

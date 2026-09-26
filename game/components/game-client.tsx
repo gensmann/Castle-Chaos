@@ -1801,8 +1801,8 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
                   Graphics quality
                   <small>
                     Performance is the default: lighter scenery and 30 fps at
-                    rest, up to 60 during action. High adds detail, glow and
-                    smoother shadows.
+                    rest, up to 60 during action. High adds denser scenery, finer masonry and
+                    sharper sprites.
                   </small>
                 </span>
                 <button

@@ -1,5 +1,5 @@
 # Castle Chaos
 
-A browser-rendered 3D castle siege game with turn-based multiplayer, evolving strongholds, questionable guests, and Havok-powered flying masonry.
+A PixiJS isometric castle siege game with turn-based multiplayer, evolving strongholds, questionable guests, and lightweight physics-driven flying masonry.
 
 The complete Sites application, setup instructions, architecture and game rules are in [game/README.md](game/README.md).

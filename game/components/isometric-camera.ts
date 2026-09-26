@@ -1,39 +1,22 @@
-import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
-import { Camera } from "@babylonjs/core/Cameras/camera";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import type { Scene } from "@babylonjs/core/scene";
 import { createTapTracker } from "@/lib/pointer-tap";
 import {
   fitIsometric,
-  ISO_ALPHA,
-  ISO_BETA,
+  projectIsometric,
   isometricDrag,
   type MapPoint,
 } from "@/lib/isometric-view";
 
-/** Own the inputs: ArcRotate's perspective radius/pinch controls don't zoom an orthographic view. */
+/** Renderer-independent isometric pan, framing and anchored zoom. */
 export function createIsometricCamera(
-  scene: Scene,
   canvas: HTMLCanvasElement,
   reducedMotion: boolean,
   onTap: (x: number, y: number) => void,
   onViewChange: (overview: boolean) => void,
 ) {
-  const camera = new ArcRotateCamera(
-    "Isometric royal survey",
-    ISO_ALPHA,
-    ISO_BETA,
-    140,
-    new Vector3(-17, 0, -12),
-    scene,
-  );
-  camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
-  camera.minZ = 0.1;
-  camera.maxZ = 420;
-  camera.inputs.clear();
+  const camera = { target: { x: -17, y: 0, z: -12 } };
   let span = 32;
   let spanGoal = span;
-  let targetGoal: Vector3 | null = null;
+  let targetGoal: MapPoint | null = null;
   let overview = false;
   let locked = false;
   let framing: { points: MapPoint[]; margin: number } | null = null;
@@ -50,11 +33,6 @@ export function createIsometricCamera(
     onViewChange(value);
   };
   const projection = () => {
-    const halfWidth = (span * aspect()) / 2;
-    camera.orthoLeft = -halfWidth;
-    camera.orthoRight = halfWidth;
-    camera.orthoTop = span / 2;
-    camera.orthoBottom = -span / 2;
     canvas.dataset.projection = "isometric";
     canvas.dataset.viewSpan = span.toFixed(2);
   };
@@ -178,10 +156,10 @@ export function createIsometricCamera(
   const frame = (points: MapPoint[], margin: number, immediate = false) => {
     framing = { points, margin };
     const fit = fitIsometric(points, aspect(), margin);
-    targetGoal = new Vector3(fit.x, 0, fit.z);
+    targetGoal = { x: fit.x, y: 0, z: fit.z };
     spanGoal = clampSpan(fit.span);
     if (immediate || reducedMotion) {
-      camera.setTarget(targetGoal, false, true, true);
+      Object.assign(camera.target, targetGoal);
       targetGoal = null;
       span = spanGoal;
       projection();
@@ -191,6 +169,28 @@ export function createIsometricCamera(
   onViewChange(false);
   return {
     camera,
+    screen(point: MapPoint) {
+      const p = projectIsometric(point),
+        center = projectIsometric(camera.target);
+      const scale = canvas.clientHeight / span;
+      return {
+        x: canvas.clientWidth / 2 + (p.x - center.x) * scale,
+        y: canvas.clientHeight / 2 - (p.y - center.y) * scale,
+      };
+    },
+    ground(clientX: number, clientY: number) {
+      const rect = canvas.getBoundingClientRect();
+      const offset = isometricDrag(
+        clientX - rect.left - rect.width / 2,
+        clientY - rect.top - rect.height / 2,
+        span / Math.max(1, rect.height),
+      );
+      return {
+        x: camera.target.x - offset.x,
+        y: 0,
+        z: camera.target.z - offset.z,
+      };
+    },
     get moving() {
       return (
         pointers.size > 0 ||
@@ -224,9 +224,15 @@ export function createIsometricCamera(
     update(dt: number) {
       const blend = reducedMotion ? 1 : 1 - Math.exp(-dt * 7);
       if (targetGoal) {
-        Vector3.LerpToRef(camera.target, targetGoal, blend, camera.target);
-        if (Vector3.DistanceSquared(camera.target, targetGoal) < 0.0001) {
-          camera.target.copyFrom(targetGoal);
+        camera.target.x += (targetGoal.x - camera.target.x) * blend;
+        camera.target.z += (targetGoal.z - camera.target.z) * blend;
+        if (
+          Math.hypot(
+            camera.target.x - targetGoal.x,
+            camera.target.z - targetGoal.z,
+          ) < 0.01
+        ) {
+          Object.assign(camera.target, targetGoal);
           targetGoal = null;
         }
       }

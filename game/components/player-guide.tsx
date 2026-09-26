@@ -210,7 +210,7 @@ export default function PlayerGuide() {
             ramparts’ protection.
           </p>
           <p>
-            Attacks play out in the 3D world with flying masonry.{" "}
+            Attacks play out in the isometric world with flying masonry.{" "}
             <b>Skip scene</b> skips the replay; the damage has already been
             applied. Reduced motion in your device settings skips replays
             automatically.
