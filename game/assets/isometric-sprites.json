@@ -1,0 +1,25 @@
+{
+  "generator": "Built-in image_gen tool",
+  "master": "masters/isometric-village-atlas.png",
+  "runtime": "../public/art/isometric-village-atlas.webp",
+  "size": [
+    1774,
+    887
+  ],
+  "grid": [
+    4,
+    2
+  ],
+  "cells": [
+    "oak",
+    "spruce",
+    "birch",
+    "rocks",
+    "cottage",
+    "workshop",
+    "tavern",
+    "keep"
+  ],
+  "compression": "cwebp -q 88 -alpha_q 100 -m 6; 495962 bytes; alpha retained",
+  "prompt": "Create an ORIGINAL production game sprite atlas for Castle Chaos, a charming classic 1990s/early-2000s isometric medieval village strategy game. True transparent PNG background, no ground backdrop, no labels, no text, no interface. Exactly EIGHT separate sprites arranged in an EXACT REGULAR 4-COLUMN BY 2-ROW GRID of equally sized square cells. Canvas aspect ratio exactly 2:1, preferably 2048x1024. Each object fully contained inside its own square cell with at least 8 percent transparent padding on every side, never crossing cell boundaries. The bottom ground-contact point of every object is at 90 percent of its cell height, centered horizontally; tall tree tops may reach 10 percent. No cast shadows beyond the object, no floor tiles. Top row left to right: 1) full rounded mature green oak tree with richly clustered leaves and short visible brown trunk; 2) full spruce tree with layered dense green needles and a visible trunk; 3) full lighter leafy birch tree with white slender trunk; 4) compact mossy rock outcrop with grass tufts and small ferns. Bottom row left to right: 5) charming medieval timber-framed cream plaster cottage, steep rich terracotta tile gable roof, chimney, blue-green window shutters and flower box; 6) small medieval carpenter/siege workshop, dusty blue slate roof, exposed wooden supports, open work bay and stacked timber; 7) cozy medieval inn, golden thatched roof, red-and-cream striped tiny entrance awning, a couple of wooden barrels; 8) compact stone keep, warm pale limestone, slate blue steep roof, two modest round turrets at the back and little burgundy pennants. Every building is viewed from precisely the same classic isometric viewpoint: camera viewing its FRONT and RIGHT facades, orthographic, 45 degree yaw, 35.264 degree elevation, no vanishing point. Trees match this elevation. Art style: finely hand-painted sprite artwork, clean outlined silhouettes with restrained dark edge accents, warm saturated natural colors, soft painterly material shading, rich legible small-scale detail, friendly and cozy classic village builder art, not photoreal, not chunky voxel, not flat icons, not modern plastic 3D renders. Upper-left sunlight on every sprite. Equal coherent world scale for buildings; readable at 128px. Truly transparent outside each silhouette including between tree branches where appropriate. Do not draw a checkerboard. Exactly four equally sized cells across and two down, no extra objects or second views. The atlas must be directly usable as a texture sheet in a real game, not a presentation board."
+}

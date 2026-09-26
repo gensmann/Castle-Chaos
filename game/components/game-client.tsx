@@ -252,8 +252,9 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   const [onlineError, setOnlineError] = useState("");
   const [copied, setCopied] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
-  const [quality, setQuality] = useState<"high" | "low">("high");
+  const [quality, setQuality] = useState<"high" | "low">("low");
   const [showMobileGuests, setShowMobileGuests] = useState(false);
+  const [realmView, setRealmView] = useState(false);
   const [command, setCommand] = useState<WorldCommand | null>(null);
   const [battle, setBattle] = useState<Battle | null>(null);
   const [seconds, setSeconds] = useState(90);
@@ -328,8 +329,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
     // Browser preferences and the initial local realm are synchronized after hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    const touchDevice = window.matchMedia("(pointer: coarse)").matches;
-    let preferredQuality: "high" | "low" = touchDevice ? "low" : "high";
+    let preferredQuality: "high" | "low" = "low";
     try {
       setSoundOn(localStorage.getItem("castle-sound") === "on");
       const saved = localStorage.getItem("castle-quality");
@@ -591,7 +591,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
     : null;
   return (
     <main
-      className={`game-shell ${battle ? "is-battling" : ""} ${settling ? "is-settling" : ""} ${showMobileGuests ? "guests-open" : ""}`}
+      className={`game-shell ${realmView ? "is-realm-view" : ""} ${battle ? "is-battling" : ""} ${settling ? "is-settling" : ""} ${showMobileGuests ? "guests-open" : ""}`}
     >
       <Toaster position="top-center" theme="dark" closeButton richColors />
       <header className="topbar">
@@ -679,6 +679,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
           }}
           battle={battle}
           onBattleEnd={finishBattle}
+          onViewChange={setRealmView}
           command={command}
           quality={quality}
         />
@@ -922,7 +923,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
           )}
           {!battle && (
             <div className="world-hint">
-              <span>DRAG TO ORBIT</span>
+              <span>DRAG TO EXPLORE</span>
               <i /> <span>PINCH OR SCROLL TO ZOOM</span>
             </div>
           )}
@@ -1096,6 +1097,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
           <span />
           <button
             aria-label="View whole realm"
+            aria-pressed={realmView}
             onClick={() => commandWorld("realm")}
           >
             <Compass size={19} />
@@ -1258,7 +1260,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
                     onClick={() => void send({ type: "build", building: b })}
                   >
                     <span className="build-art">
-                      <BuildingArt kind={b} />
+                      <BuildingArt kind={b} level={mine.buildings[b]} />
                       <span>
                         {[0, 1, 2].map((i) => (
                           <i className={i < level ? "lit" : ""} key={i} />
@@ -1782,8 +1784,9 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
                   <Sparkles size={18} />
                   Graphics quality
                   <small>
-                    High: crisp detail and rich vegetation. Performance: fewer
-                    pixels and lighter shadows.
+                    Performance is the default: lighter scenery and 30 fps at
+                    rest, up to 60 during action. High adds detail, glow and
+                    smoother shadows.
                   </small>
                 </span>
                 <button

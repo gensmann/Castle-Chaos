@@ -69,10 +69,11 @@ export default function PlayerGuide() {
               </dd>
             </div>
             <div>
-              <dt>Turn the camera</dt>
+              <dt>Explore the map</dt>
               <dd>
-                Drag one finger across the 3D scene. With a mouse, hold the left
-                button and drag.
+                Drag one finger across the isometric map. With a mouse, hold the
+                left button and drag. The viewing angle stays fixed; arrow keys
+                also move the map when it has keyboard focus.
               </dd>
             </div>
             <div>

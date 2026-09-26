@@ -1,8 +1,24 @@
 import type { Building, Weapon } from "@/lib/game";
 
 /** Small illustrated miniatures stay sharp at every HUD scale, without image requests. */
-export default function BuildingArt({ kind }: { kind: Building | Weapon }) {
-  const isBuilding = ["keep", "tavern", "workshop"].includes(kind);
+export default function BuildingArt({
+  kind,
+  level = 0,
+}: {
+  kind: Building | Weapon;
+  level?: number;
+}) {
+  if (["keep", "tavern", "workshop"].includes(kind)) {
+    const column =
+      kind === "keep" ? (level > 0 ? 3 : 0) : kind === "workshop" ? 1 : 2;
+    return (
+      <span
+        aria-hidden="true"
+        className="building-miniature village-miniature"
+        style={{ backgroundPosition: `${(column * 100) / 3}% 100%` }}
+      />
+    );
+  }
   return (
     <svg
       className="building-miniature"
@@ -13,58 +29,7 @@ export default function BuildingArt({ kind }: { kind: Building | Weapon }) {
       <ellipse cx="48" cy="75" rx="38" ry="9" fill="#071713" opacity=".45" />
       <path d="M8 67 47 52 88 66 48 82Z" fill="#607b59" />
       <path d="M8 67 48 82 88 66 88 71 48 87 8 72Z" fill="#344b3d" />
-      {isBuilding ? (
-        <>
-          <path d="M23 41 50 32 77 43 77 66 50 77 23 65Z" fill="#d1c39d" />
-          <path d="M50 49 77 43 77 66 50 77Z" fill="#91896e" />
-          <path
-            d="M19 44 35 19 54 32 50 53Z"
-            fill={kind === "tavern" ? "#bc7959" : "#6ca39a"}
-          />
-          <path
-            d="M35 19 62 12 82 41 50 53Z"
-            fill={kind === "tavern" ? "#8e4d3a" : "#386964"}
-          />
-          <path
-            d="M19 44 50 53 82 41M35 19 50 53"
-            stroke="#d5bb7d"
-            strokeWidth="2"
-          />
-          <path
-            d="M26 48V64M47 54V73M26 57 47 65M53 56 74 49"
-            stroke="#66533b"
-            strokeWidth="3"
-          />
-          <path d="M33 61Q33 53 39 56Q43 57 43 63V72L33 68Z" fill="#423d2e" />
-          <path
-            d="M59 53 67 50 67 59 59 62Z"
-            fill="#f4cc79"
-            stroke="#5c513c"
-            strokeWidth="2"
-          />
-          <path d="M65 22V8L73 6V28Z" fill="#bdb095" />
-          <path d="M64 8 70 5 76 7 70 10Z" fill="#e5d5b2" />
-          {kind === "keep" && (
-            <>
-              <path d="M35 20V2" stroke="#e3c37c" strokeWidth="2" />
-              <path d="M36 2 54 5 49 9 36 9Z" fill="#e6b866" />
-            </>
-          )}
-          {kind === "tavern" && (
-            <>
-              <path d="M21 52H12V66" stroke="#d5b675" strokeWidth="2" />
-              <rect x="8" y="58" width="12" height="12" rx="2" fill="#c49b52" />
-              <path d="M12 61v5h4v-5" stroke="#65452e" strokeWidth="2" />
-            </>
-          )}
-          {kind === "workshop" && (
-            <>
-              <path d="M58 70 74 64 83 68 66 75Z" fill="#9a734b" />
-              <path d="M62 73v7m16-10v7" stroke="#523f2d" strokeWidth="3" />
-            </>
-          )}
-        </>
-      ) : kind === "walls" ? (
+      {kind === "walls" ? (
         <>
           <path d="M19 34 39 29 77 43 77 67 39 78 19 65Z" fill="#acb3a0" />
           <path d="M39 43 77 43 77 67 39 78Z" fill="#7a8d82" />

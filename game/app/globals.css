@@ -4953,3 +4953,73 @@ a {
   height: 100%;
   background: var(--team-color);
 }
+
+/* The isometric map stays flat to the screen; drag to survey the kingdom. */
+.world canvas {
+  cursor: grab;
+}
+.world canvas[data-dragging="true"] {
+  cursor: grabbing;
+}
+.world canvas:focus-visible {
+  outline: 2px solid #d9c88a;
+  outline-offset: -3px;
+}
+.camera-controls button[aria-pressed="true"] {
+  color: #fff2ba;
+  background: #68725388;
+}
+.is-realm-view .left-rail,
+.is-realm-view .right-rail,
+.is-realm-view .location-plaque,
+.is-realm-view .mobile-guests-toggle {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.is-realm-view .camera-controls {
+  right: 22px;
+}
+.is-realm-view .stage-vignette {
+  opacity: 0.35;
+}
+.is-realm-view .realm-landmark {
+  background: #1e3029ed;
+}
+.realm-landmark:focus-visible {
+  outline: 2px solid #f0d797;
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .is-realm-view .camera-controls {
+    right: 10px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .camera-controls button {
+    transition:
+      color 0.18s,
+      background 0.18s,
+      transform 0.18s;
+  }
+  .camera-controls button:active {
+    transform: scale(0.9);
+  }
+  .build-card:hover .building-miniature {
+    transform: translateY(-3px);
+  }
+  .building-miniature {
+    transition: transform 0.2s ease;
+  }
+}
+.village-miniature {
+  display: block;
+  background-image: url("/art/isometric-village-atlas.webp");
+  background-size: 400% 200%;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 3px 2px #10201666);
+}
+.build-art > .village-miniature {
+  height: 76px;
+  margin-top: 0;
+}

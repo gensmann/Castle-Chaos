@@ -34,7 +34,7 @@ void main() {
   float b = p.x * -0.8 + p.y * 2.4 - time * 0.9;
   vec3 normal = normalize(vec3(cos(a) * 0.055 + cos(b) * 0.025, 1.0,
                               cos(a) * 0.023 + cos(b) * 0.075));
-  vec3 view = normalize(eye - vPosition);
+  vec3 view = normalize(vec3(1.0, 1.0, -1.0));
   float fresnel = pow(1.0 - max(0.0, dot(normal, view)), 3.0);
   vec3 water = mix(vec3(0.12, 0.36, 0.36), vec3(0.49, 0.71, 0.67), fresnel);
   float broad = sin(p.x * 0.14 + p.y * 0.18 + time * 0.12) * 0.5 + 0.5;
@@ -43,7 +43,7 @@ void main() {
   float sun = pow(max(dot(normal, halfway), 0.0), 240.0);
   float ripple = pow(max(0.0, sin(a) * sin(b)), 14.0);
   water += (sun * 0.6 + ripple * 0.075) * vec3(1.0, 0.91, 0.66);
-  float distanceFog = 1.0 - exp(-length(eye - vPosition) * 0.003);
+  float distanceFog = 1.0 - exp(-length(eye - vPosition) * 0.0008);
   water = mix(water, vec3(0.64, 0.75, 0.71), distanceFog);
   gl_FragColor = vec4(mix(water, water * vec3(0.81, 0.89, 0.99), rain * 0.5), 1.0);
 }`,

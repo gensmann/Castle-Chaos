@@ -4,13 +4,15 @@ import HavokPhysics from "@babylonjs/havok";
 import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 import type { Game, Battle, Player } from "@/lib/game";
 import { HOME_POSITIONS, CLEARINGS, positionOf } from "@/lib/game";
-import { createSky, createWaterMaterial } from "./world-atmosphere";
-import { createTapTracker } from "@/lib/pointer-tap";
+import { createWaterMaterial } from "./world-atmosphere";
+import { createIsometricCamera } from "./isometric-camera";
+import { createWorldLife } from "./world-life";
+import { villageTexture } from "./world-materials";
+import { createVillageSprites, type VillageSprite } from "./world-sprites";
 import "@babylonjs/core/Engines/Extensions/engine.dynamicTexture";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/core/Culling/ray";
-import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -46,6 +48,7 @@ type Props = {
   onSelectPlayer: (id: string) => void;
   battle: Battle | null;
   onBattleEnd: () => void;
+  onViewChange: (overview: boolean) => void;
   command: WorldCommand | null;
   quality: "high" | "low";
 };
@@ -82,38 +85,30 @@ function createWorld(
       1 / Math.min(window.devicePixelRatio || 1, highQuality ? 1.6 : 1),
     );
   resizeResolution();
+  engine.maxFPS = highQuality ? 60 : 30;
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.64, 0.75, 0.71, 1);
   scene.ambientColor = rgb("#253427");
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
-  scene.imageProcessingConfiguration.exposure = 1.05;
-  scene.imageProcessingConfiguration.contrast = 1.08;
+  scene.imageProcessingConfiguration.exposure = 1.12;
+  scene.imageProcessingConfiguration.contrast = 1.04;
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogColor = rgb("#a3bfb5");
-  scene.fogDensity = 0.0045;
-  const camera = new ArcRotateCamera(
-    "Royal survey",
-    -Math.PI / 2.8,
-    1.03,
-    38,
-    new Vector3(-17, 2, -12),
+  scene.fogDensity = 0.0012;
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  const view = createIsometricCamera(
     scene,
+    canvas,
+    reduceMotion,
+    selectAt,
+    (overview) => propsRef.current.onViewChange(overview),
   );
-  camera.attachControl(canvas, false);
-  camera.useNaturalPinchZoom = true;
-  camera.lowerRadiusLimit = 17;
-  camera.upperRadiusLimit = 105;
-  camera.lowerBetaLimit = 0.35;
-  camera.upperBetaLimit = 1.38;
-  camera.wheelPrecision = 18;
-  camera.panningSensibility = 65;
-  camera.inertia = 0.75;
-  camera.minZ = 0.2;
-  camera.maxZ = 600;
-  camera.inputs.attached.keyboard?.detachControl();
+  const camera = view.camera;
   const hemi = new HemisphericLight("Sky", new Vector3(0.3, 1, 0.4), scene);
-  hemi.intensity = 0.7;
+  hemi.intensity = 0.85;
   hemi.diffuse = rgb("#ccd9c2");
   hemi.groundColor = rgb("#6d795e");
   const sun = new DirectionalLight(
@@ -129,18 +124,25 @@ function createWorld(
     sun,
   );
   shadows.usePercentageCloserFiltering = true;
-  shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
-  shadows.setDarkness(0.4);
+  shadows.filteringQuality = highQuality
+    ? ShadowGenerator.QUALITY_MEDIUM
+    : ShadowGenerator.QUALITY_LOW;
+  const shadowMap = shadows.getShadowMap()!;
+  shadowMap.refreshRate = highQuality ? 1 : 4;
+  shadows.setDarkness(0.32);
   shadows.bias = 0.001;
   shadows.normalBias = 0.035;
   sun.shadowMinZ = 1;
   sun.shadowMaxZ = 150;
-  const skyMaterial = createSky(scene);
-  const glow = new GlowLayer("Torchglow", scene, {
-    blurKernelSize: 32,
-    mainTextureRatio: highQuality ? 0.5 : 0.25,
-  });
-  glow.intensity = 0.36;
+  const life = createWorldLife(scene, shadows, highQuality);
+  const sprites = createVillageSprites(scene);
+  if (highQuality) {
+    const glow = new GlowLayer("Torchglow", scene, {
+      blurKernelSize: 24,
+      mainTextureRatio: 0.35,
+    });
+    glow.intensity = 0.25;
+  }
   let serial = 0;
   let randomSeed = 428;
   const rnd = () => {
@@ -165,31 +167,21 @@ function createWorld(
     woodLight = mat("Cut wood", "#a18050"),
     dark = mat("Dark iron", "#313b37"),
     stone = mat("Limestone", "#b3b6a0"),
-    roof = mat("Copper roof", "#438f89"),
-    clay = mat("Clay roof", "#b36d4b"),
+    roof = mat("Slate roof", "#ffffff"),
+    clay = mat("Clay roof", "#ffffff"),
     gold = mat("Aged brass", "#d4b45f"),
     windowMat = mat("Lamplight", "#ffc36b", true),
-    bark = mat("Old oak bark", "#d1c5a7"),
     leaf = [
-      mat("Leaf pine", "#406957"),
-      mat("Leaf fern", "#577e50"),
-      mat("Leaf bright", "#84964f"),
-      mat("Leaf gold", "#ad9354"),
+      mat("Leaf pine", "#477949"),
+      mat("Leaf fern", "#658f45"),
+      mat("Leaf bright", "#8ca84a"),
+      mat("Leaf gold", "#9fa957"),
     ];
-  const barkTexture = new Texture("/art/tree-bark.webp", scene);
-  barkTexture.uScale = 1.5;
-  barkTexture.vScale = 2;
-  bark.diffuseTexture = barkTexture;
-  bark.specularColor = Color3.Black();
-  const timberTexture = barkTexture.clone();
-  if (timberTexture) {
-    timberTexture.uScale = 1;
-    timberTexture.vScale = 2;
-    wood.diffuseTexture = timberTexture;
-    woodLight.diffuseTexture = timberTexture;
-    wood.diffuseColor = rgb("#aa8e6e");
-    woodLight.diffuseColor = rgb("#e5c398");
-  }
+  const timberTexture = villageTexture(scene, "timber");
+  wood.diffuseTexture = timberTexture;
+  woodLight.diffuseTexture = timberTexture;
+  wood.diffuseColor = rgb("#a38158");
+  woodLight.diffuseColor = rgb("#f4d39a");
   // Low-frequency painted textures keep silhouettes readable at strategy-camera distance.
   function paintedTexture(name: string, base: string, foliage = false) {
     const texture = new DynamicTexture(name, 256, scene, true);
@@ -207,28 +199,26 @@ function createWorld(
     texture.update(false);
     return texture;
   }
-  const leafTexture = paintedTexture("Painted foliage", "#c2d0a9", true);
+  const leafTexture = paintedTexture("Painted foliage", "#e4eccd", true);
   leaf.forEach((material) => {
     material.diffuseTexture = leafTexture;
     material.specularColor = Color3.Black();
   });
-  const stoneTexture = new Texture("/art/castle-stone.webp", scene);
+  const stoneTexture = villageTexture(scene, "stone");
   stoneTexture.uScale = 2;
   stoneTexture.vScale = 2;
   stone.diffuseTexture = stoneTexture;
-  stone.diffuseColor = rgb("#e0dec8");
-  stone.emissiveColor = rgb("#171c15");
+  stone.diffuseColor = rgb("#c7c4b6");
+  stone.emissiveColor = rgb("#10130f");
   const fieldstoneTexture = new Texture("/art/fieldstone.webp", scene);
   fieldstoneTexture.uScale = 1.5;
   fieldstoneTexture.vScale = 1;
   rock.diffuseTexture = fieldstoneTexture;
   rock.diffuseColor = rgb("#a3b1a3");
   rock.specularColor = Color3.Black();
-  const roofTexture = new Texture("/art/roof-copper.webp", scene);
-  roofTexture.uScale = 1;
-  roofTexture.vScale = 1;
-  roof.diffuseTexture = roofTexture;
-  roof.diffuseColor = rgb("#c5e3db");
+  roof.diffuseTexture = villageTexture(scene, "slate");
+  clay.diffuseTexture = villageTexture(scene, "clay");
+  roof.specularColor = clay.specularColor = Color3.Black();
   function meshSetup(
     m: Mesh,
     material: StandardMaterial,
@@ -300,7 +290,7 @@ function createWorld(
   ) {
     const a = MeshBuilder.CreateIcoSphere(
       `${name}-${serial++}`,
-      { radius: size, subdivisions: 2, flat: false },
+      { radius: size, subdivisions: highQuality ? 2 : 1, flat: false },
       scene,
     );
     a.position.set(x, y, z);
@@ -350,7 +340,12 @@ function createWorld(
   }
   const terrain = MeshBuilder.CreateGround(
     "The Unreasonable Isles",
-    { width: 150, height: 140, subdivisions: 120, updatable: true },
+    {
+      width: 150,
+      height: 140,
+      subdivisions: highQuality ? 120 : 80,
+      updatable: true,
+    },
     scene,
   );
   const vertices = terrain.getVerticesData(VertexBuffer.PositionKind)!;
@@ -361,7 +356,7 @@ function createWorld(
     vertices[i + 1] = landHeight(x, z);
     const elevation = vertices[i + 1];
     const meadowBlend = Math.max(0, Math.min(1, (elevation + 0.4) / 2.8));
-    const color = Color3.Lerp(rgb("#b9c494"), rgb("#ded9ad"), meadowBlend);
+    const color = Color3.Lerp(rgb("#d9ecc7"), rgb("#f0efc8"), meadowBlend);
     // Continuous beach and valley colors avoid hard bands that resemble shadow artifacts.
     if (elevation < -0.3)
       Color3.LerpToRef(
@@ -377,7 +372,7 @@ function createWorld(
   VertexData.ComputeNormals(vertices, terrain.getIndices()!, normals);
   terrain.updateVerticesData(VertexBuffer.NormalKind, normals);
   terrain.setVerticesData(VertexBuffer.ColorKind, colors);
-  const meadowTexture = paintedTexture("Painted meadow", "#93a76d");
+  const meadowTexture = paintedTexture("Painted meadow", "#98b96a");
   meadowTexture.uScale = 15;
   meadowTexture.vScale = 14;
   const terrainMat = mat("Living terrain", "#ffffff");
@@ -459,8 +454,8 @@ function createWorld(
     height: number,
     depth: number,
   ) {
-    const rows = Math.ceil(height / 0.48),
-      cols = Math.ceil(width / 0.78),
+    const rows = Math.ceil(height / (highQuality ? 0.48 : 0.9)),
+      cols = Math.ceil(width / (highQuality ? 0.78 : 1.4)),
       bw = width / cols,
       bh = height / rows;
     const key = [bw.toFixed(3), bh.toFixed(3), depth.toFixed(3)].join("-");
@@ -618,7 +613,12 @@ function createWorld(
             m.isEnabled() &&
             !m.isDisposed() &&
             m.material !== windowMat &&
-            Vector3.DistanceSquared(m.getAbsolutePosition(), point) < 40,
+            !m.name.startsWith("Castle detail /") &&
+            (m.isPickable || m.metadata?.collider) &&
+            Vector3.DistanceSquared(
+              m.getBoundingInfo().boundingBox.centerWorld,
+              point,
+            ) < 40,
         )
         .slice(0, 36);
       for (const m of remaining) {
@@ -629,7 +629,7 @@ function createWorld(
           { width: extent.x, height: extent.y, depth: extent.z },
           scene,
         );
-        collider.position = m.getAbsolutePosition().clone();
+        collider.position = m.getBoundingInfo().boundingBox.centerWorld.clone();
         collider.isVisible = false;
         collider.isPickable = false;
         const aggregate = new PhysicsAggregate(
@@ -673,150 +673,39 @@ function createWorld(
     canvas.dataset.rubble = String(physicalRubble.length);
   }
   const sceneryStart = scene.meshes.length;
-  // Batched vegetation: thousands of leaves, a handful of draw calls.
-  const treeTemplates: Mesh[] = [];
-  for (let k = 0; k < 4; k++) {
-    const parts: Mesh[] = [];
-    const trunk = cyl(
-      "tree-trunk",
-      0,
-      1.2,
-      0,
-      0.38,
-      2.4,
-      bark,
-      undefined,
-      0.19,
-      8,
-    );
-    parts.push(trunk);
-    // Root flares and forked limbs give the silhouettes the same irregularity
-    // as the bark. All parts are merged once before instancing the forest.
-    for (let n = 0; n < 3; n++) {
-      const angle = (n / 3) * Math.PI * 2;
-      const root = cyl(
-        "Root flare",
-        Math.sin(angle) * 0.19,
-        0.3,
-        Math.cos(angle) * 0.19,
-        0.24,
-        0.85,
-        bark,
-        undefined,
-        0.1,
-        6,
-      );
-      root.rotation.z = Math.cos(angle) * 0.6;
-      root.rotation.x = Math.sin(angle) * 0.6;
-      parts.push(root);
-    }
-    if (k < 3) {
-      for (let l = 0; l < 4; l++) {
-        const crown = cyl(
-          "pine",
-          Math.sin(l * 2.7) * 0.09,
-          1.45 + l * 0.68,
-          Math.cos(l * 3.1) * 0.07,
-          2.2 - l * 0.4,
-          1.55,
-          leaf[k],
-          undefined,
-          0.02,
-          16,
-        );
-        const positions = crown.getVerticesData(VertexBuffer.PositionKind)!;
-        for (let v = 0; v < positions.length; v += 3) {
-          const angle = Math.atan2(positions[v + 2], positions[v]);
-          const scale =
-            1 + Math.sin(angle * 7 + l) * 0.11 + Math.cos(angle * 11) * 0.06;
-          positions[v] *= scale;
-          positions[v + 2] *= scale;
-          if (positions[v + 1] < 0)
-            positions[v + 1] += Math.sin(angle * 9 + l) * 0.1;
-        }
-        crown.setVerticesData(VertexBuffer.PositionKind, positions);
-        const normals: number[] = [];
-        VertexData.ComputeNormals(positions, crown.getIndices()!, normals);
-        crown.setVerticesData(VertexBuffer.NormalKind, normals);
-        parts.push(crown);
-      }
-    } else {
-      for (let n = 0; n < 4; n++) {
-        const angle = n * 2.4;
-        const branch = cyl(
-          "Oak branch",
-          Math.sin(angle) * 0.38,
-          1.9,
-          Math.cos(angle) * 0.38,
-          0.18,
-          1.7,
-          bark,
-          undefined,
-          0.09,
-          7,
-        );
-        branch.rotation.x = Math.cos(angle) * 0.55;
-        branch.rotation.z = Math.sin(angle) * 0.55;
-        parts.push(branch);
-      }
-      for (let n = 0; n < 12; n++) {
-        const a = sphere(
-          "oak",
-          Math.sin(n * 2.4) * (n < 8 ? 0.95 : 0.4),
-          2.3 + (n % 4) * 0.34,
-          Math.cos(n * 2.4) * (n < 8 ? 0.9 : 0.4),
-          0.64 + (n % 3) * 0.1,
-          leaf[n % 3 === 0 ? 2 : k],
-        );
-        a.scaling.y = 0.85 + (n % 3) * 0.17;
-        parts.push(a);
-      }
-    }
-    const merged = Mesh.MergeMeshes(parts, true, true, undefined, false, true)!;
-    merged.name = `forest-${k}`;
-    merged.isVisible = false;
-    treeTemplates.push(merged);
-  }
-  for (let k = 0; k < 4; k++) {
+  // Each painted landscape element is only two triangles. Thin instances keep
+  // the entire forest to one draw per species, even with hundreds of trees.
+  for (const [k, kind] of (
+    ["oak", "spruce", "birch", "rocks"] as VillageSprite[]
+  ).entries()) {
     const transforms: Matrix[] = [];
-    for (let i = 0; i < 105; i++) {
-      const x = (rnd() - 0.5) * 115,
-        z = (rnd() - 0.5) * 100,
-        y = landHeight(x, z);
+    const count = kind === "rocks" ? 65 : highQuality ? 100 : 65;
+    for (let i = 0; i < count; i++) {
+      const x = (rnd() - 0.5) * 115;
+      const z = (rnd() - 0.5) * 100;
+      const y = landHeight(x, z);
       if (
-        y < 0.3 ||
+        y < 0.25 ||
         HOME_POSITIONS.some((p) => Math.hypot(x - p[0], z - p[1]) < 12) ||
-        Math.abs(x - (3 + Math.sin(z * 0.075) * 8)) < 2.6
+        Math.abs(x - (3 + Math.sin(z * 0.075) * 8)) < 2.8
       )
         continue;
-      const scale = 0.85 + rnd() * 1.1;
+      const size = kind === "rocks" ? 1.8 + rnd() * 1.6 : 4.5 + rnd() * 3;
       transforms.push(
-        Matrix.Scaling(scale, scale * (0.85 + rnd() * 0.3), scale)
-          .multiply(Matrix.RotationY(rnd() * 6.28))
-          .multiply(Matrix.Translation(x, y, z)),
+        Matrix.Scaling(size, size, size).multiply(
+          Matrix.Translation(x, y + 0.03, z),
+        ),
       );
     }
-    const template = treeTemplates[k];
+    const source = sprites.template(kind);
     if (transforms.length) {
-      template.isVisible = true;
-      template.thinInstanceAdd(transforms);
-      template.thinInstanceRefreshBoundingInfo(true);
-      shadows.addShadowCaster(template);
+      source.isVisible = true;
+      source.thinInstanceAdd(transforms);
+      source.thinInstanceRefreshBoundingInfo(true);
+      source.freezeWorldMatrix();
     }
-  }
-  // Rocks, wildflowers, mushrooms and forgotten ruins.
-  for (let i = 0; i < 90; i++) {
-    const x = (rnd() - 0.5) * 120,
-      z = (rnd() - 0.5) * 100,
-      y = landHeight(x, z);
-    if (
-      y < -0.9 ||
-      HOME_POSITIONS.some((p) => Math.hypot(x - p[0], z - p[1]) < 9)
-    )
-      continue;
-    const r = sphere("mossy rock", x, y, z, 0.5 + rnd() * 1.3, rock);
-    r.scaling.y = 0.65;
-    r.rotation.y = rnd() * Math.PI;
+    // Sparse flowers below make the silhouette edges sit naturally on the meadow.
+    source.metadata = { landscape: k };
   }
   const flowerMats = [
     mat("Foxglove", "#b8a5d0"),
@@ -894,7 +783,7 @@ function createWorld(
   (tuft.material as StandardMaterial).backFaceCulling = false;
   tuft.isPickable = false;
   const grassMatrices: Matrix[] = [];
-  for (let n = 0; n < (highQuality ? 4200 : 1600); n++) {
+  for (let n = 0; n < (highQuality ? 3000 : 900); n++) {
     const x = -50 + rnd() * 100,
       z = -45 + rnd() * 90,
       y = landHeight(x, z);
@@ -937,6 +826,8 @@ function createWorld(
   }
   // Worn lanes connect the settlements to the crossing and give the meadow scale.
   const pathMaterial = mat("Old trade road", "#a5a17b");
+  pathMaterial.diffuseTexture = villageTexture(scene, "road");
+  pathMaterial.diffuseColor = rgb("#eddfb7");
   pathMaterial.specularColor = Color3.Black();
   for (const [homeX, homeZ] of HOME_POSITIONS) {
     const banks: Vector3[][] = [[], []];
@@ -989,7 +880,16 @@ function createWorld(
   terrain.freezeWorldMatrix();
   scene.skipPointerMovePicking = true;
 
-  const banners: { mesh: Mesh; offset: number }[] = [];
+  const banners: {
+    mesh: Mesh;
+    offset: number;
+    rest: number[];
+    positions: number[];
+  }[] = [];
+  const siegeRigs = new Map<
+    string,
+    { pivot: TransformNode; rest: number; fired: number }
+  >();
   const fires: { mesh: Mesh; base: number }[] = [];
   function flag(
     parent: TransformNode,
@@ -1016,7 +916,7 @@ function createWorld(
       {
         width: 1.05 * scale,
         height: 0.66 * scale,
-        subdivisions: 8,
+        subdivisions: highQuality ? 8 : 4,
         updatable: true,
       },
       scene,
@@ -1039,13 +939,12 @@ function createWorld(
     const bannerMaterial = mat(`Banner${color}`, color);
     bannerMaterial.backFaceCulling = false;
     meshSetup(m, bannerMaterial, parent, false);
-    banners.push({ mesh: m, offset: rnd() * 10 });
-  }
-  function torch(parent: TransformNode, x: number, y: number, z: number) {
-    box("Torch iron", x, y, z, 0.12, 0.55, 0.14, dark, parent);
-    const m = sphere("Flame", x, y + 0.35, z, 0.17, windowMat, parent);
-    m.scaling.y = 1.7;
-    fires.push({ mesh: m, base: y + 0.35 });
+    banners.push({
+      mesh: m,
+      offset: rnd() * 10,
+      rest: Array.from(cloth),
+      positions: Array.from(cloth),
+    });
   }
   function gable(
     parent: TransformNode,
@@ -1069,111 +968,29 @@ function createWorld(
     style: number,
     scale = 1,
   ) {
-    const grp = new TransformNode("Timber building", scene);
-    grp.parent = parent;
-    grp.position.set(x, 0, z);
-    grp.scaling.setAll(scale);
-    box("Plaster", 0, 1.3, 0, 3.7, 2.6, 3, mat("Warm plaster", "#d6b993"), grp);
-    box("Timber base", 0, 0.2, 0, 3.85, 0.4, 3.15, wood, grp);
-    for (const xx of [-1.72, 0, 1.72])
-      box("Vertical frame", xx, 1.3, -1.55, 0.16, 2.65, 0.12, wood, grp);
-    box("Cross frame", 0, 1.25, -1.56, 3.6, 0.15, 0.14, wood, grp);
-    for (const xx of [-1.65, 1.65])
-      box("Side frame", xx, 1.3, 0, 0.15, 2.65, 3.2, wood, grp);
-    const a = box(
-      "Roof left",
-      -0.98,
-      3.15,
+    const group = new TransformNode("Painted timber building", scene);
+    group.parent = parent;
+    group.position.set(x, 0, z);
+    group.scaling.setAll(scale);
+    const kind = style === 1 ? "tavern" : style === 2 ? "workshop" : "cottage";
+    sprites.place(kind, group, 1.3, 0.02, -1.3, 6.2);
+    // A simple invisible volume gives physical rubble something solid to hit.
+    const volume = box(
+      "Timber building collision",
       0,
-      2.6,
-      0.25,
-      3.9,
-      style ? clay : roof,
-      grp,
-    );
-    a.rotation.z = 0.55;
-    const b = box(
-      "Roof right",
-      0.98,
-      3.15,
+      1.6,
       0,
-      2.6,
-      0.25,
-      3.9,
-      style ? clay : roof,
-      grp,
+      3.8,
+      3.2,
+      3.2,
+      wood,
+      group,
+      false,
     );
-    b.rotation.z = -0.55;
-    const gableFace = new Mesh("Plaster gable", scene);
-    const gableData = new VertexData();
-    gableData.positions = [-1.85, 2.6, -1.52, 1.85, 2.6, -1.52, 0, 3.85, -1.52];
-    gableData.indices = [0, 2, 1];
-    gableData.normals = [0, 0, -1, 0, 0, -1, 0, 0, -1];
-    gableData.applyToMesh(gableFace);
-    meshSetup(gableFace, mat("Warm plaster", "#d6b993"), grp);
-    box("Gable kingpost", 0, 3.1, -1.6, 0.14, 1.25, 0.12, wood, grp);
-    box("Roof ridge cap", 0, 3.86, 0, 0.22, 0.18, 4.05, woodLight, grp);
-    for (const side of [-1, 1]) {
-      box(
-        "Window shutter",
-        -0.8 + side * 0.49,
-        1.65,
-        -1.62,
-        0.27,
-        0.78,
-        0.12,
-        roof,
-        grp,
-      );
-      box(
-        "Door jamb",
-        0.55 + side * 0.46,
-        0.78,
-        -1.68,
-        0.13,
-        1.6,
-        0.16,
-        woodLight,
-        grp,
-      );
-    }
-    box("Window sill", -0.8, 1.26, -1.72, 1.3, 0.13, 0.4, woodLight, grp);
-    box("Door lintel", 0.55, 1.59, -1.68, 1.05, 0.17, 0.16, woodLight, grp);
-    box("Doorstep", 0.55, 0.06, -1.96, 1.25, 0.12, 0.7, stone, grp);
-    box("Door", 0.55, 0.75, -1.57, 0.75, 1.5, 0.1, wood, grp);
-    box("Cottage window", -0.8, 1.65, -1.58, 0.62, 0.65, 0.11, windowMat, grp);
-    box("Window bar", -0.8, 1.65, -1.65, 0.07, 0.7, 0.05, wood, grp);
-    box("Chimney", 1.2, 3.6, 0.65, 0.56, 1.9, 0.6, stone, grp);
-    box("Chimney cap", 1.2, 4.55, 0.65, 0.75, 0.15, 0.77, woodLight, grp);
-    for (const side of [-1, 1]) {
-      const trim = box(
-        "Gable trim",
-        side * 0.98,
-        3.16,
-        -2.03,
-        2.65,
-        0.16,
-        0.13,
-        woodLight,
-        grp,
-      );
-      trim.rotation.z = side < 0 ? 0.55 : -0.55;
-      box("Roof eave", side * 2.06, 2.5, 0, 0.13, 0.2, 4.1, woodLight, grp);
-    }
-    for (const xx of [-1.3, -0.5, 0.3, 1.1])
-      box(
-        "Door plank",
-        0.55 + xx * 0.22,
-        0.75,
-        -1.64,
-        0.07,
-        1.45,
-        0.03,
-        woodLight,
-        grp,
-      );
-    sphere("Doorknob", 0.8, 0.78, -1.7, 0.055, gold, grp);
-    return grp;
+    volume.isVisible = false;
+    volume.metadata = { collider: true };
+    life.smoke(group, 0.3, 4.5, 0.9);
+    return group;
   }
   const realmLabels = new Map<
     string,
@@ -1192,6 +1009,8 @@ function createWorld(
     const pos = positionOf(p, index);
     parent.position.set(pos.x, 0.75, pos.z);
     castleRoots.set(p.id, parent);
+    for (const [key, rig] of siegeRigs)
+      if (rig.pivot.isDisposed()) siegeRigs.delete(key);
     const manor = p.buildings.keep;
     const team = mat(`Team ${p.color}`, p.color);
     parent.metadata = { player: p.id };
@@ -1265,85 +1084,22 @@ function createWorld(
       cottage(parent, 0, 0, 0, 1.2);
       flag(parent, -1.9, 3.6, 0, p.color);
     } else {
-      const height = manor === 3 ? 7 : 5.8;
-      box("Keep foundation", 0, 0.25, 0, 7.2, 0.5, 6.1, stone, parent);
-      masonry(parent, 0, -2.5, 6.3, height, 0.55);
-      masonry(parent, 0, 2.5, 6.3, height, 0.55);
-      box("Keep side", -3, height / 2, 0, 0.5, height, 4.8, stone, parent);
-      box("Keep side", 3, height / 2, 0, 0.5, height, 4.8, stone, parent);
-      box(
-        "Upper cornice",
+      sprites.place("keep", parent, 1.8, 0.04, -1.8, manor === 3 ? 11.4 : 10);
+      const volume = box(
+        "Keep collision",
         0,
-        height - 0.35,
+        3,
         0,
-        6.7,
-        0.35,
-        5.6,
-        woodLight,
+        6.3,
+        6,
+        5,
+        stone,
         parent,
+        false,
       );
-      for (let floor = 0; floor < 2; floor++)
-        for (const x of [-1.9, 0, 1.9]) {
-          box(
-            "Window recess",
-            x,
-            1.8 + floor * 2.05,
-            -2.63,
-            0.66,
-            1.15,
-            0.1,
-            dark,
-            parent,
-          );
-          box(
-            "Window glow",
-            x,
-            1.8 + floor * 2.05,
-            -2.7,
-            0.4,
-            0.88,
-            0.03,
-            windowMat,
-            parent,
-          );
-          box(
-            "Window mullion",
-            x,
-            1.8 + floor * 2.05,
-            -2.74,
-            0.08,
-            1,
-            0.05,
-            stone,
-            parent,
-          );
-        }
-      gable(parent, 0, height + 1.35, 0, 8, 2.8, 7, roof);
-      box("Royal doorway", 0, 1, -2.8, 1.2, 2.1, 0.2, wood, parent);
-      flag(parent, 0, height + 2.3, 0, p.color, 1.1);
-      for (const [x, z] of [
-        [-3.2, 2.6],
-        [3.2, 2.6],
-      ]) {
-        cyl("Keep turret", x, height * 0.52, z, 2, height + 1.2, stone, parent);
-        cyl("Turret hat", x, height + 1.6, z, 2.8, 2, roof, parent, 0);
-        for (const y of [0.3, height * 0.48, height + 0.45])
-          cyl("Turret stone belt", x, y, z, 2.18, 0.23, stone, parent);
-        box(
-          "Turret arrow slit",
-          x,
-          height - 0.5,
-          z - 1.015,
-          0.14,
-          0.82,
-          0.05,
-          dark,
-          parent,
-        );
-        flag(parent, x, height + 2.4, z, p.color, 0.65);
-      }
-      torch(parent, -1.2, 1.7, -2.9);
-      torch(parent, 1.2, 1.7, -2.9);
+      volume.isVisible = false;
+      volume.metadata = { collider: true };
+      flag(parent, -3.6, 0, -2.6, p.color, 1.1);
     }
     if (p.buildings.walls) {
       const h = 1.6 + p.buildings.walls * 0.65;
@@ -1400,13 +1156,83 @@ function createWorld(
       for (const x of [-1, 1])
         box("Gate post", x, h / 2, -5.4, 0.35, h, 0.8, stone, parent);
     }
+    if (manor > 0 && p.hp > 0)
+      life.village(parent, p.color, p.buildings.workshop > 0);
     if (p.buildings.tavern) {
       cottage(parent, -7.8, -0.5, 1, 0.75);
       box("Tavern sign", -6.3, 1.7, -2, 0.55, 0.65, 0.08, gold, parent);
     }
     if (p.buildings.workshop) {
-      cottage(parent, 6.6, 2, 0, 0.7);
+      cottage(parent, 6.6, 2, 2, 0.7);
       box("Workbench", 7.2, 0.7, -0.5, 1.8, 0.15, 0.8, wood, parent);
+    }
+    if (manor > 0) {
+      const well = new TransformNode("Village well", scene);
+      well.parent = parent;
+      well.position.set(3.3, 0, -3.4);
+      for (let n = 0; n < 10; n++) {
+        const angle = (n * Math.PI) / 5;
+        const block = box(
+          "Well stone",
+          Math.sin(angle) * 0.55,
+          0.35,
+          Math.cos(angle) * 0.55,
+          0.34,
+          0.65,
+          0.28,
+          stone,
+          well,
+        );
+        block.rotation.y = angle;
+      }
+      for (const x of [-0.65, 0.65])
+        box("Well upright", x, 1.1, 0, 0.14, 2.2, 0.14, wood, well);
+      const spindle = cyl(
+        "Well spindle",
+        0,
+        1.5,
+        0,
+        0.13,
+        1.45,
+        woodLight,
+        well,
+      );
+      spindle.rotation.z = Math.PI / 2;
+      box("Well rope", 0.12, 0.93, 0, 0.04, 1.2, 0.04, woodLight, well);
+      gable(well, 0, 2.1, 0, 1.85, 0.65, 1.4, clay);
+      const garden = new TransformNode("Kitchen garden", scene);
+      garden.parent = parent;
+      garden.position.set(-8.5, -0.05, 2.7);
+      box(
+        "Garden soil",
+        0,
+        0.06,
+        0,
+        2.5,
+        0.12,
+        2.5,
+        mat("Rich soil", "#795f3e"),
+        garden,
+        false,
+      );
+      for (let row = 0; row < 3; row++)
+        for (let col = 0; col < 4; col++) {
+          const cabbage = sphere(
+            "Cabbage",
+            -0.9 + col * 0.6,
+            0.26,
+            -0.8 + row * 0.75,
+            0.24,
+            leaf[2],
+            garden,
+          );
+          cabbage.scaling.y = 0.72;
+        }
+      for (const x of [-1.4, 1.4]) {
+        for (const z of [-1.4, 0, 1.4])
+          box("Garden post", x, 0.4, z, 0.12, 0.85, 0.12, woodLight, garden);
+        box("Garden rail", x, 0.5, 0, 0.1, 0.12, 2.8, woodLight, garden);
+      }
     }
     if (p.buildings.quarry) {
       for (let n = 0; n < 9; n++)
@@ -1458,19 +1284,13 @@ function createWorld(
           }
         beam(new Vector3(-0.6, 0.5, 0), new Vector3(0, 2, 0), 0.18, wood, wp);
         beam(new Vector3(0.6, 0.5, 0), new Vector3(0, 2, 0), 0.18, wood, wp);
-        const arm = box(
-          "Throwing arm",
-          0,
-          2.1,
-          -0.35,
-          0.16,
-          0.16,
-          3,
-          woodLight,
-          wp,
-        );
-        arm.rotation.x = -0.65;
-        box("Counterweight", 0, 1.55, 1, 0.6, 0.7, 0.5, stone, wp);
+        const pivot = new TransformNode("Siege axle", scene);
+        pivot.parent = wp;
+        pivot.position.y = 2.1;
+        pivot.rotation.x = -0.65;
+        box("Throwing arm", 0, 0, -0.35, 0.16, 0.16, 3, woodLight, pivot);
+        box("Counterweight", 0, -0.45, 1, 0.6, 0.7, 0.5, stone, pivot);
+        siegeRigs.set(`${p.id}:${w}`, { pivot, rest: -0.65, fired: -1 });
         if (w === "goatapult") {
           sphere("Goat payload", 0, 3, -1.4, 0.38, stone, wp);
         }
@@ -1510,6 +1330,45 @@ function createWorld(
       for (let n = 0; n < 5; n++)
         sphere("Rubble", -3 + n * 1.2, 0.2, -3.3, 0.35, stone, parent);
     }
+    // Batch rigid decoration while keeping masonry, breakable roof pieces and
+    // articulated parts separate. A rebuilt castle must not accumulate draw calls.
+    const animated = new Set<Mesh>([
+      ...banners.map((b) => b.mesh),
+      ...fires.map((f) => f.mesh),
+    ]);
+    const decorations = new Map<StandardMaterial, Mesh[]>();
+    for (const mesh of parent.getChildMeshes()) {
+      if (
+        !(mesh instanceof Mesh) ||
+        !mesh.material ||
+        !mesh.isVisible ||
+        animated.has(mesh) ||
+        (mesh.parent !== parent &&
+          !["Timber building", "Village well", "Kitchen garden"].includes(
+            mesh.parent?.name ?? "",
+          )) ||
+        /Shelter|Vertical frame|Roof|Merlon|Tower tooth|Cross frame|Keep side|Side wall|Corner tower|Keep foundation/.test(
+          mesh.name,
+        )
+      )
+        continue;
+      const material = mesh.material as StandardMaterial;
+      const group = decorations.get(material) ?? [];
+      group.push(mesh);
+      decorations.set(material, group);
+    }
+    for (const [material, pieces] of decorations) {
+      if (pieces.length < 2) continue;
+      pieces.forEach((piece) => piece.computeWorldMatrix(true));
+      const merged = Mesh.MergeMeshes(pieces, true, true)!;
+      merged.name = `Castle detail / ${material.name}`;
+      merged.setParent(parent);
+      merged.receiveShadows = true;
+      shadows.addShadowCaster(merged);
+      merged.onDisposeObservable.addOnce(() =>
+        shadows.removeShadowCaster(merged),
+      );
+    }
     parent.getChildMeshes().forEach((m) => {
       m.metadata = { ...m.metadata, player: p.id };
     });
@@ -1517,52 +1376,19 @@ function createWorld(
       parent.scaling.y = 0.22;
       parent.rotation.z = 0.07;
     }
+    parent.computeWorldMatrix(true);
+    for (const mesh of parent.getChildMeshes()) {
+      if (mesh.parent === parent && !animated.has(mesh as Mesh)) {
+        mesh.freezeWorldMatrix();
+        mesh.doNotSyncBoundingInfo = true;
+      }
+    }
+    shadowMap.resetRefreshCounter();
   }
-  const hero = new TransformNode("Borg Meister", scene);
-  const cloak = mat("Royal cloak", "#b77840");
-  cyl("Coat", 0, 0.55, 0, 0.68, 1.1, cloak, hero, 0.38, 8);
-  sphere("Face", 0, 1.32, 0, 0.31, mat("Skin", "#e1ba8e"), hero);
-  cyl("Crown", 0, 1.65, 0, 0.65, 0.24, gold, hero, 0.68, 7);
-  for (let n = 0; n < 5; n++) {
-    const a = n * 1.256;
-    sphere(
-      "Crown point",
-      Math.sin(a) * 0.25,
-      1.87,
-      Math.cos(a) * 0.25,
-      0.07,
-      gold,
-      hero,
-    );
-  }
-  box("Backpack", 0, 0.8, 0.35, 0.5, 0.65, 0.27, wood, hero);
-  for (const x of [-0.45, 0.45]) {
-    const arm = cyl(
-      "Sleeve",
-      x,
-      0.85,
-      0,
-      0.26,
-      0.65,
-      cloak,
-      hero,
-      undefined,
-      8,
-    );
-    arm.rotation.z = x > 0 ? -0.22 : 0.22;
-    sphere("Hand", x, 0.52, -0.05, 0.14, mat("Skin", "#e1ba8e"), hero);
-  }
-  for (const x of [-0.12, 0.12]) {
-    sphere("Eye white", x, 1.4, -0.25, 0.095, stone, hero);
-    sphere("Pupil", x, 1.4, -0.33, 0.043, dark, hero);
-  }
-  sphere("Royal nose", 0, 1.26, -0.31, 0.12, mat("Skin", "#e1ba8e"), hero);
-  const beard = sphere("Improbable moustache", 0, 1.17, -0.3, 0.15, wood, hero);
-  beard.scaling.x = 1.45;
-  beard.scaling.y = 0.42;
+  const heroRig = life.character("Borg Meister", "#b77840", true);
+  const hero = heroRig.root;
   hero.scaling.setAll(1.3);
-  for (const x of [-0.19, 0.19])
-    box("Boot", x, 0.1, -0.04, 0.22, 0.25, 0.42, dark, hero);
+  let heroSpeed = 0;
   const rings: Mesh[] = [];
   for (let n = 0; n < 3; n++) {
     const r = MeshBuilder.CreateTorus(
@@ -1594,13 +1420,8 @@ function createWorld(
   let data = propsRef.current.game;
   let me = propsRef.current.me;
   let first = true;
-  const reduceMotion = window.matchMedia(
-    "(prefers-reduced-motion: reduce)",
-  ).matches;
   let landingTime = reduceMotion ? 2 : 0;
   let heroTarget = new Vector3(-17, 0.8, -12);
-  let cameraGoal: Vector3 | null = null;
-  let radiusGoal: number | null = null;
   let battleState: {
     event: Battle;
     time: number;
@@ -1703,8 +1524,7 @@ function createWorld(
       hero.position = heroTarget.clone();
       hero.position.y = 24;
       landingTime = reduceMotion ? 2 : 0;
-      camera.setTarget(new Vector3(base[0] + 1, 1.7, base[1]));
-      camera.radius = 27;
+      view.focus(new Vector3(base[0] + 1, 1.7, base[1]), true);
     }
     if (!settling) {
       const pos = positionOf(mine, index);
@@ -1712,20 +1532,22 @@ function createWorld(
     }
   }
   function command(c: WorldCommand) {
-    if (c.kind === "zoom-in") radiusGoal = Math.max(17, camera.radius - 8);
-    else if (c.kind === "zoom-out")
-      radiusGoal = Math.min(105, camera.radius + 10);
+    if (battleState) return;
+    if (c.kind === "zoom-in") view.zoom(1 / 1.25);
+    else if (c.kind === "zoom-out") view.zoom(1.25);
     else if (c.kind === "realm") {
-      cameraGoal = new Vector3(0, 1, 5);
-      radiusGoal = 100;
+      view.frame(
+        data.players.map((p, i) => ({ ...positionOf(p, i), y: 3 })),
+        14,
+        true,
+      );
     } else {
       const idx = Math.max(
         0,
         data.players.findIndex((p) => p.id === (c.id ?? me)),
       );
       const pos = positionOf(data.players[idx], idx);
-      cameraGoal = new Vector3(pos.x, 2, pos.z);
-      radiusGoal = c.kind === "home" ? 27 : 30;
+      view.focus({ ...pos, y: 2 });
     }
   }
   function attack(b: Battle | null) {
@@ -1733,10 +1555,14 @@ function createWorld(
       battleState.projectile.dispose();
       battleState = null;
     }
-    if (!b) return;
+    if (!b) {
+      view.lock(false);
+      return;
+    }
     const f = data.players.findIndex((p) => p.id === b.from),
       t = data.players.findIndex((p) => p.id === b.to);
     if (f < 0 || t < 0) {
+      view.lock(false);
       propsRef.current.onBattleEnd();
       return;
     }
@@ -1767,26 +1593,16 @@ function createWorld(
           : rock,
     );
     battleState = { event: b, time: 0, projectile, start, end, hit: false };
-    cameraGoal = Vector3.Center(start, end).add(new Vector3(0, 2, 0));
-    radiusGoal = Math.min(65, Vector3.Distance(start, end) * 1.05 + 12);
+    view.lock(true);
+    const apex = Vector3.Center(start, end).add(new Vector3(0, 14.2, 0));
+    view.frame([start, end, apex], 10);
+    const siegeRig = siegeRigs.get(`${b.from}:${b.weapon}`);
+    if (siegeRig) siegeRig.fired = 0;
   }
-  const taps = createTapTracker();
-  const onDown = (e: PointerEvent) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    taps.down(e.pointerId, e.clientX, e.clientY);
-    // Touch takes over immediately from a camera-button transition.
-    if (!battleState) {
-      cameraGoal = null;
-      radiusGoal = null;
-    }
-  };
-  const onMove = (e: PointerEvent) =>
-    taps.move(e.pointerId, e.clientX, e.clientY);
-  const onCancel = (e: PointerEvent) => taps.cancel(e.pointerId);
-  const onUp = (e: PointerEvent) => {
-    if (!taps.up(e.pointerId, e.clientX, e.clientY) || battleState) return;
+  function selectAt(clientX: number, clientY: number) {
+    if (battleState) return;
     const rect = canvas.getBoundingClientRect();
-    const picked = scene.pick(e.clientX - rect.left, e.clientY - rect.top);
+    const picked = scene.pick(clientX - rect.left, clientY - rect.top);
     if (!picked?.hit) return;
     const meta = picked.pickedMesh?.metadata;
     if (meta?.plot !== undefined) {
@@ -1812,15 +1628,11 @@ function createWorld(
     } else if (meta?.player) {
       propsRef.current.onSelectPlayer(meta.player);
     }
-  };
-  canvas.addEventListener("pointerdown", onDown);
-  canvas.addEventListener("pointermove", onMove);
-  canvas.addEventListener("pointercancel", onCancel);
-  window.addEventListener("pointerup", onUp);
-  window.addEventListener("blur", taps.reset);
+  }
   const resize = () => {
     resizeResolution();
     engine.resize();
+    view.resize();
   };
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
@@ -1840,43 +1652,58 @@ function createWorld(
     waterMaterial.setFloat("time", time);
     waterMaterial.setFloat("rain", weatherBlend);
     waterMaterial.setVector3("eye", camera.globalPosition);
-    skyMaterial.setFloat("time", time);
-    skyMaterial.setFloat("rain", weatherBlend);
     sun.intensity = 1.2 - weatherBlend * 0.75;
-    scene.fogDensity = 0.0045 + weatherBlend * 0.003;
+    scene.fogDensity = 0.0012 + weatherBlend * 0.0018;
 
-    if (cameraGoal) {
-      camera.target = Vector3.Lerp(
-        camera.target,
-        cameraGoal,
-        Math.min(1, dt * 3),
-      );
-      if (Vector3.Distance(camera.target, cameraGoal) < 0.06) cameraGoal = null;
-    }
-    if (radiusGoal !== null) {
-      camera.radius += (radiusGoal - camera.radius) * Math.min(1, dt * 3);
-      if (Math.abs(camera.radius - radiusGoal) < 0.1) radiusGoal = null;
-    }
+    view.update(dt);
+    let landingSquash = 0;
     if (landingTime < 1.65) {
       hero.position.y = 0.8 + Math.max(0, 24 - 16 * landingTime * landingTime);
       hero.rotation.y = time * 3;
+      landingSquash = Math.max(0, 1 - Math.abs(landingTime - 1.28) / 0.24);
     } else {
       const delta = heroTarget.subtract(hero.position);
       delta.y = 0;
-      if (delta.length() > 0.07) {
-        hero.rotation.y = Math.atan2(delta.x, delta.z);
-        const distance = delta.length();
-        hero.position.addInPlace(
-          delta.normalize().scale(Math.min(distance, dt * 4)),
+      const distance = delta.length();
+      const desiredSpeed = distance > 0.05 ? Math.min(4, distance * 5) : 0;
+      heroSpeed += (desiredSpeed - heroSpeed) * Math.min(1, dt * 9);
+      if (distance > 0.02) {
+        const yaw = Math.atan2(-delta.x, -delta.z);
+        const difference = Math.atan2(
+          Math.sin(yaw - hero.rotation.y),
+          Math.cos(yaw - hero.rotation.y),
         );
-        hero.position.y = 0.8 + Math.abs(Math.sin(time * 12)) * 0.15;
-      } else hero.position.y = 0.8 + Math.sin(time * 2) * 0.02;
-    }
-    banners.forEach((b) => {
-      if (!b.mesh.isDisposed()) {
-        b.mesh.rotation.y = Math.sin(time * 2 + b.offset) * 0.18;
-        b.mesh.rotation.x = Math.sin(time * 2.8 + b.offset) * 0.05;
+        hero.rotation.y += difference * Math.min(1, dt * 9);
+        hero.position.addInPlace(
+          delta.scale(Math.min(distance, dt * heroSpeed) / distance),
+        );
       }
+      hero.position.y = 0.8;
+    }
+    heroRig.tick(time, dt, heroSpeed / 1.3, landingSquash);
+    life.update(time, dt, reduceMotion);
+    siegeRigs.forEach((rig) => {
+      if (rig.fired < 0 || rig.pivot.isDisposed()) return;
+      rig.fired += dt;
+      const t = rig.fired;
+      const release = Math.min(1, t / 0.24);
+      const returnToRest = Math.max(0, Math.min(1, (t - 0.7) / 1.5));
+      rig.pivot.rotation.x =
+        rig.rest + Math.sin((release * Math.PI) / 2) * 1.8 * (1 - returnToRest);
+      if (t > 2.2) {
+        rig.fired = -1;
+        rig.pivot.rotation.x = rig.rest;
+      }
+    });
+    banners.forEach((b) => {
+      if (b.mesh.isDisposed()) return;
+      for (let i = 0; i < b.positions.length; i += 3) {
+        const distance = b.rest[i];
+        b.positions[i + 2] =
+          b.rest[i + 2] +
+          Math.sin(distance * 6 - time * 3.5 + b.offset) * distance * 0.14;
+      }
+      b.mesh.updateVerticesData(VertexBuffer.PositionKind, b.positions);
     });
     fires.forEach((f) => {
       if (!f.mesh.isDisposed()) {
@@ -1885,8 +1712,8 @@ function createWorld(
       }
     });
     fireflies.forEach((m, n) => {
-      m.position.y += Math.sin(time + n) * dt * 0.12;
-      m.position.x += Math.sin(time * 0.7 + n) * dt * 0.18;
+      m.position.y += Math.sin(time + n) * (reduceMotion ? 0 : dt) * 0.12;
+      m.position.x += Math.sin(time * 0.7 + n) * (reduceMotion ? 0 : dt) * 0.18;
     });
     if (battleState) {
       const b = battleState;
@@ -1897,9 +1724,9 @@ function createWorld(
         0.5 * 9.81 * 3.4 * 3.4 * progress * (1 - progress);
       b.projectile.rotation.x += dt * 5;
       b.projectile.rotation.z += dt * 3;
-      if (progress > 0.58 && progress < 0.62) {
-        cameraGoal = b.end.add(new Vector3(0, 1, 0));
-        radiusGoal = 23;
+      if (progress > 0.65 && !b.hit) {
+        // Follow the impact only after the whole flight has been readable.
+        if (b.time - dt <= 3.4 * 0.65) view.focus(b.end);
       }
       if (progress >= 1 && !b.hit) {
         b.hit = true;
@@ -1913,6 +1740,7 @@ function createWorld(
       if (b.time > 5.3) {
         b.projectile.dispose();
         battleState = null;
+        view.lock(false);
         propsRef.current.onBattleEnd();
       }
     }
@@ -1956,6 +1784,13 @@ function createWorld(
       }
     }
     scene.physicsEnabled = physicalRubble.some((r) => r.aggregate !== null);
+    const active =
+      highQuality ||
+      battleState !== null ||
+      scene.physicsEnabled ||
+      view.moving;
+    engine.maxFPS = active ? 60 : 30;
+    shadowMap.refreshRate = highQuality || scene.physicsEnabled ? 1 : 4;
     scene.render();
     labelTick += dt;
     diagnosticTick += dt;
@@ -1974,7 +1809,7 @@ function createWorld(
         );
         const visible =
           !battleState &&
-          camera.radius > 45 &&
+          (view.overview || view.span > 52) &&
           screen.z > 0 &&
           screen.z < 1 &&
           screen.x > 30 &&
@@ -1988,6 +1823,9 @@ function createWorld(
     }
     if (diagnosticTick > 1) {
       diagnosticTick = 0;
+      canvas.dataset.cameraTarget = `${camera.target.x.toFixed(2)},${camera.target.z.toFixed(2)}`;
+      canvas.dataset.cameraAngles = `${camera.alpha.toFixed(4)},${camera.beta.toFixed(4)}`;
+      canvas.dataset.frameBudget = String(engine.maxFPS);
       canvas.dataset.fps = String(Math.round(engine.getFps()));
       canvas.dataset.activeMeshes = String(scene.getActiveMeshes().length);
       canvas.dataset.quality = highQuality ? "high" : "low";
@@ -2009,11 +1847,7 @@ function createWorld(
       disposed = true;
       observer.disconnect();
       landmarks.replaceChildren();
-      canvas.removeEventListener("pointerdown", onDown);
-      canvas.removeEventListener("pointermove", onMove);
-      canvas.removeEventListener("pointercancel", onCancel);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("blur", taps.reset);
+      view.dispose();
       engine.stopRenderLoop();
       physicalRubble.forEach((r) => r.aggregate?.dispose());
       staticColliders.forEach((c) => c.aggregate.dispose());
@@ -2069,7 +1903,7 @@ export default function World(props: Props) {
     <div className="world">
       <canvas
         ref={canvas}
-        aria-label="Interactive 3D kingdom. Drag to orbit, pinch or scroll to zoom; tap clearings or rival castles. Camera buttons are also available."
+        aria-label="Interactive isometric kingdom. Drag or use arrow keys to pan, pinch or scroll to zoom; tap clearings or rival castles. Camera buttons are also available."
         tabIndex={0}
       />
       <div
