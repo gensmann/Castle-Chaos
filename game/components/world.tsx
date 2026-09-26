@@ -2,9 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import HavokPhysics from "@babylonjs/havok";
 import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
-import type { Game, Battle, Player, Building, Weapon } from "@/lib/game";
+import type { Game, Battle, Player } from "@/lib/game";
 import { HOME_POSITIONS, CLEARINGS, positionOf } from "@/lib/game";
+import { createSky, createWaterMaterial } from "./world-atmosphere";
 import { createTapTracker } from "@/lib/pointer-tap";
+import "@babylonjs/core/Engines/Extensions/engine.dynamicTexture";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/core/Culling/ray";
@@ -19,6 +21,7 @@ import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import "@babylonjs/core/Meshes/instancedMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
@@ -52,13 +55,16 @@ type Runtime = {
   attack: (b: Battle | null) => void;
   dispose: () => void;
 };
+let havokRuntime: ReturnType<typeof HavokPhysics> | undefined;
 const rgb = (s: string) => Color3.FromHexString(s);
 
 function createWorld(
   canvas: HTMLCanvasElement,
   propsRef: React.RefObject<Props>,
+  landmarks: HTMLDivElement,
   ready: () => void,
 ): Runtime {
+  const highQuality = propsRef.current.quality === "high";
   const engine = new Engine(
     canvas,
     true,
@@ -70,22 +76,22 @@ function createWorld(
     },
     false,
   );
-  engine.setHardwareScalingLevel(
-    Math.max(
-      1,
-      window.devicePixelRatio / (window.innerWidth < 700 ? 1.25 : 1.6),
-    ),
-  );
+  // Engine adaptToDeviceRatio is off: scale is relative to CSS pixels, not DPR.
+  const resizeResolution = () =>
+    engine.setHardwareScalingLevel(
+      1 / Math.min(window.devicePixelRatio || 1, highQuality ? 1.6 : 1),
+    );
+  resizeResolution();
   const scene = new Scene(engine);
-  scene.clearColor = new Color4(0.19, 0.28, 0.28, 0);
+  scene.clearColor = new Color4(0.64, 0.75, 0.71, 1);
   scene.ambientColor = rgb("#253427");
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
-  scene.imageProcessingConfiguration.exposure = 1.15;
-  scene.imageProcessingConfiguration.contrast = 1.12;
+  scene.imageProcessingConfiguration.exposure = 1.05;
+  scene.imageProcessingConfiguration.contrast = 1.08;
   scene.fogMode = Scene.FOGMODE_EXP2;
-  scene.fogColor = rgb("#668480");
-  scene.fogDensity = 0.009;
+  scene.fogColor = rgb("#a3bfb5");
+  scene.fogDensity = 0.0045;
   const camera = new ArcRotateCamera(
     "Royal survey",
     -Math.PI / 2.8,
@@ -104,19 +110,19 @@ function createWorld(
   camera.panningSensibility = 65;
   camera.inertia = 0.75;
   camera.minZ = 0.2;
-  camera.maxZ = 300;
+  camera.maxZ = 600;
   camera.inputs.attached.keyboard?.detachControl();
   const hemi = new HemisphericLight("Sky", new Vector3(0.3, 1, 0.4), scene);
-  hemi.intensity = 0.72;
+  hemi.intensity = 0.7;
   hemi.diffuse = rgb("#ccd9c2");
-  hemi.groundColor = rgb("#384c40");
+  hemi.groundColor = rgb("#6d795e");
   const sun = new DirectionalLight(
     "Late afternoon",
     new Vector3(-0.6, -1, 0.45),
     scene,
   );
   sun.position = new Vector3(30, 65, -30);
-  sun.intensity = 1.4;
+  sun.intensity = 1.2;
   sun.diffuse = rgb("#fff0cd");
   const shadows = new ShadowGenerator(
     propsRef.current.quality === "low" ? 1024 : 2048,
@@ -124,11 +130,16 @@ function createWorld(
   );
   shadows.usePercentageCloserFiltering = true;
   shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  shadows.setDarkness(0.4);
   shadows.bias = 0.001;
   shadows.normalBias = 0.035;
   sun.shadowMinZ = 1;
   sun.shadowMaxZ = 150;
-  const glow = new GlowLayer("Torchglow", scene, { blurKernelSize: 32 });
+  const skyMaterial = createSky(scene);
+  const glow = new GlowLayer("Torchglow", scene, {
+    blurKernelSize: 32,
+    mainTextureRatio: highQuality ? 0.5 : 0.25,
+  });
   glow.intensity = 0.36;
   let serial = 0;
   let randomSeed = 428;
@@ -149,8 +160,7 @@ function createWorld(
     mats.set(name, m);
     return m;
   }
-  const grass = mat("Grass", "#73925a"),
-    rock = mat("Cliff", "#626f69"),
+  const rock = mat("Cliff", "#626f69"),
     wood = mat("Timber", "#665037"),
     woodLight = mat("Cut wood", "#a18050"),
     dark = mat("Dark iron", "#313b37"),
@@ -161,10 +171,10 @@ function createWorld(
     windowMat = mat("Lamplight", "#ffc36b", true),
     bark = mat("Old oak bark", "#d1c5a7"),
     leaf = [
-      mat("Leaf pine", "#9bbcaf"),
-      mat("Leaf fern", "#b8cfaa"),
-      mat("Leaf bright", "#d0d9a9"),
-      mat("Leaf gold", "#e2cc8d"),
+      mat("Leaf pine", "#406957"),
+      mat("Leaf fern", "#577e50"),
+      mat("Leaf bright", "#84964f"),
+      mat("Leaf gold", "#ad9354"),
     ];
   const barkTexture = new Texture("/art/tree-bark.webp", scene);
   barkTexture.uScale = 1.5;
@@ -180,9 +190,24 @@ function createWorld(
     wood.diffuseColor = rgb("#aa8e6e");
     woodLight.diffuseColor = rgb("#e5c398");
   }
-  const leafTexture = new Texture("/art/tree-leaves.webp", scene);
-  leafTexture.uScale = 2;
-  leafTexture.vScale = 1.5;
+  // Low-frequency painted textures keep silhouettes readable at strategy-camera distance.
+  function paintedTexture(name: string, base: string, foliage = false) {
+    const texture = new DynamicTexture(name, 256, scene, true);
+    const ctx = texture.getContext();
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 2200; i++) {
+      const light = rnd() > 0.48;
+      ctx.fillStyle = light ? "rgba(239,229,174,0.085)" : "rgba(35,65,47,0.07)";
+      const x = rnd() * 256,
+        y = rnd() * 256,
+        size = foliage ? 3 + rnd() * 9 : 1 + rnd() * 3;
+      ctx.fillRect(x, y, size, size * (foliage ? 0.7 : 0.3));
+    }
+    texture.update(false);
+    return texture;
+  }
+  const leafTexture = paintedTexture("Painted foliage", "#c2d0a9", true);
   leaf.forEach((material) => {
     material.diffuseTexture = leafTexture;
     material.specularColor = Color3.Black();
@@ -191,11 +216,13 @@ function createWorld(
   stoneTexture.uScale = 2;
   stoneTexture.vScale = 2;
   stone.diffuseTexture = stoneTexture;
+  stone.diffuseColor = rgb("#e0dec8");
+  stone.emissiveColor = rgb("#171c15");
   const fieldstoneTexture = new Texture("/art/fieldstone.webp", scene);
   fieldstoneTexture.uScale = 1.5;
   fieldstoneTexture.vScale = 1;
   rock.diffuseTexture = fieldstoneTexture;
-  rock.diffuseColor = rgb("#bcc6a7");
+  rock.diffuseColor = rgb("#a3b1a3");
   rock.specularColor = Color3.Black();
   const roofTexture = new Texture("/art/roof-copper.webp", scene);
   roofTexture.uScale = 1;
@@ -211,7 +238,10 @@ function createWorld(
     m.material = material;
     m.receiveShadows = true;
     m.parent = parent ?? null;
-    if (shadow) shadows.addShadowCaster(m);
+    if (shadow) {
+      shadows.addShadowCaster(m);
+      m.onDisposeObservable.addOnce(() => shadows.removeShadowCaster(m));
+    }
     return m;
   }
   function box(
@@ -310,11 +340,17 @@ function createWorld(
       if (d < 14)
         y = y * (Math.max(0, d - 9) / 5) + 0.65 * (1 - Math.max(0, d - 9) / 5);
     }
+    // Carve a real river bed so the water follows the land instead of floating over it.
+    const riverDistance = Math.abs(x - (3 + Math.sin(z * 0.075) * 8));
+    if (r < 0.94 && riverDistance < 2.3) {
+      const bank = Math.min(1, Math.max(0, (riverDistance - 0.95) / 1.35));
+      y = -0.6 + (y + 0.6) * bank * bank * (3 - 2 * bank);
+    }
     return y;
   }
   const terrain = MeshBuilder.CreateGround(
     "The Unreasonable Isles",
-    { width: 150, height: 140, subdivisions: 75, updatable: true },
+    { width: 150, height: 140, subdivisions: 120, updatable: true },
     scene,
   );
   const vertices = terrain.getVerticesData(VertexBuffer.PositionKind)!;
@@ -323,15 +359,17 @@ function createWorld(
     const x = vertices[i],
       z = vertices[i + 2];
     vertices[i + 1] = landHeight(x, z);
-    const color = rgb(
-      vertices[i + 1] < -0.7
-        ? "#b2a079"
-        : vertices[i + 1] < 0.2
-          ? "#839376"
-          : Math.sin(x * 0.32) * Math.cos(z * 0.4) > 0.1
-            ? "#d2deb2"
-            : "#b8c99f",
-    );
+    const elevation = vertices[i + 1];
+    const meadowBlend = Math.max(0, Math.min(1, (elevation + 0.4) / 2.8));
+    const color = Color3.Lerp(rgb("#b9c494"), rgb("#ded9ad"), meadowBlend);
+    // Continuous beach and valley colors avoid hard bands that resemble shadow artifacts.
+    if (elevation < -0.3)
+      Color3.LerpToRef(
+        color,
+        rgb("#c6b58a"),
+        Math.min(1, (-elevation - 0.3) / 0.9),
+        color,
+      );
     colors.push(color.r, color.g, color.b, 1);
   }
   terrain.updateVerticesData(VertexBuffer.PositionKind, vertices);
@@ -339,18 +377,17 @@ function createWorld(
   VertexData.ComputeNormals(vertices, terrain.getIndices()!, normals);
   terrain.updateVerticesData(VertexBuffer.NormalKind, normals);
   terrain.setVerticesData(VertexBuffer.ColorKind, colors);
-  const meadowTexture = new Texture("/art/ground-meadow.webp", scene);
-  meadowTexture.uScale = 26;
-  meadowTexture.vScale = 24;
+  const meadowTexture = paintedTexture("Painted meadow", "#93a76d");
+  meadowTexture.uScale = 15;
+  meadowTexture.vScale = 14;
   const terrainMat = mat("Living terrain", "#ffffff");
   terrainMat.diffuseTexture = meadowTexture;
+  terrainMat.emissiveColor = rgb("#182313");
+  terrainMat.specularColor = Color3.Black();
   terrain.material = terrainMat;
   terrain.receiveShadows = true;
   terrain.metadata = { ground: true };
-  const waterMaterial = mat("Still waters", "#547f7c");
-  waterMaterial.alpha = 0.91;
-  waterMaterial.specularColor = rgb("#abccc0");
-  waterMaterial.specularPower = 60;
+  const waterMaterial = createWaterMaterial(scene);
   const water = MeshBuilder.CreateGround(
     "The Inconvenient Sea",
     { width: 500, height: 500 },
@@ -359,26 +396,25 @@ function createWorld(
   water.position.y = -1.65;
   water.material = waterMaterial;
   water.isPickable = false;
-  // A narrow stream loops around the meadows. Its banks are real scene geometry.
-  const riverPoints: Vector3[] = [];
-  for (let i = 0; i < 45; i++) {
-    const z = -62 + i * 2.8;
+  water.freezeWorldMatrix();
+  const riverBanks: Vector3[][] = [[], []];
+  for (let i = 0; i <= 100; i++) {
+    const z = -53 + i * 1.06;
     const x = 3 + Math.sin(z * 0.075) * 8;
-    riverPoints.push(new Vector3(x, 0.72, z));
+    for (let bank = 0; bank < 2; bank++)
+      riverBanks[bank].push(new Vector3(x + (bank ? 1 : -1) * 1.45, 0.13, z));
   }
-  const riverMat = mat("River", "#619994");
-  const stream = MeshBuilder.CreateTube(
+  const stream = MeshBuilder.CreateRibbon(
     "Silverbrook",
-    { path: riverPoints, radius: 1.1, tessellation: 8 },
+    { pathArray: riverBanks },
     scene,
   );
-  stream.material = riverMat;
-  stream.scaling.y = 0.09;
-  stream.position.y = 0.68;
+  stream.material = waterMaterial;
   stream.isPickable = false;
+  stream.freezeWorldMatrix();
   let physicsReady = false;
   const physicsBodies: PhysicsAggregate[] = [];
-  HavokPhysics({ locateFile: () => havokWasmUrl })
+  (havokRuntime ??= HavokPhysics({ locateFile: () => havokWasmUrl }))
     .then((havok) => {
       if (scene.isDisposed) return;
       scene.enablePhysics(
@@ -399,6 +435,8 @@ function createWorld(
       canvas.dataset.physics = "havok";
     })
     .catch((e) => {
+      havokRuntime = undefined;
+      if (scene.isDisposed) return;
       console.error("Havok initialization failed", e);
       canvas.dataset.physics = "unavailable";
     });
@@ -409,7 +447,7 @@ function createWorld(
   }[] = [];
   const physicalRubble: {
     mesh: Mesh;
-    aggregate: PhysicsAggregate;
+    aggregate: PhysicsAggregate | null;
     age: number;
   }[] = [];
   const brickTemplates = new Map<string, Mesh>();
@@ -434,6 +472,7 @@ function createWorld(
         scene,
       );
       template.material = stone;
+      template.receiveShadows = true;
       template.isVisible = false;
       template.isPickable = false;
       brickTemplates.set(key, template);
@@ -443,15 +482,33 @@ function createWorld(
         const m = template.createInstance("Masonry brick");
         m.parent = parent;
         m.position.set(x - width / 2 + bw * (col + 0.5), bh * (row + 0.5), z);
-        m.receiveShadows = true;
         m.metadata = {
           destructible: true,
           dimensions: [bw - 0.025, bh - 0.022, depth],
         };
         shadows.addShadowCaster(m);
+        m.onDisposeObservable.addOnce(() => shadows.removeShadowCaster(m));
       }
   }
+  const impactWaves: { mesh: Mesh; material: StandardMaterial; age: number }[] =
+    [];
+  function impactWave(point: Vector3, magic: boolean) {
+    const material = new StandardMaterial("Impact light", scene);
+    material.emissiveColor = rgb(magic ? "#c5a2ff" : "#efcd8b");
+    material.disableLighting = true;
+    material.alpha = 0.65;
+    const ring = MeshBuilder.CreateTorus(
+      "Impact wave",
+      { diameter: 1, thickness: 0.045, tessellation: 48 },
+      scene,
+    );
+    ring.position.set(point.x, 0.88, point.z);
+    ring.material = material;
+    ring.isPickable = false;
+    impactWaves.push({ mesh: ring, material, age: 0 });
+  }
   function shatter(targetId: string, point: Vector3, magic: boolean) {
+    impactWave(point, magic);
     const root = castleRoots.get(targetId);
     const candidates = (root?.getChildMeshes() ?? [])
       .filter(
@@ -504,6 +561,9 @@ function createWorld(
       chunk.isPickable = false;
       chunk.receiveShadows = true;
       shadows.addShadowCaster(chunk);
+      chunk.onDisposeObservable.addOnce(() =>
+        shadows.removeShadowCaster(chunk),
+      );
       original?.setEnabled(false);
       const outward = pos.subtract(point);
       if (outward.length() < 0.1)
@@ -612,7 +672,7 @@ function createWorld(
     }
     canvas.dataset.rubble = String(physicalRubble.length);
   }
-  const staticMeshes: Mesh[] = [];
+  const sceneryStart = scene.meshes.length;
   // Batched vegetation: thousands of leaves, a handful of draw calls.
   const treeTemplates: Mesh[] = [];
   for (let k = 0; k < 4; k++) {
@@ -756,7 +816,7 @@ function createWorld(
       continue;
     const r = sphere("mossy rock", x, y, z, 0.5 + rnd() * 1.3, rock);
     r.scaling.y = 0.65;
-    staticMeshes.push(r);
+    r.rotation.y = rnd() * Math.PI;
   }
   const flowerMats = [
     mat("Foxglove", "#b8a5d0"),
@@ -772,16 +832,26 @@ function createWorld(
     sphere("wildflower", x, y + 0.2, z, 0.13, flowerMats[i % 3]);
   }
   // Footbridge, signpost, supplies, a generous quantity of mushrooms.
+  const bridgeX = 3 + Math.sin(-21 * 0.075) * 8;
   for (let i = 0; i < 15; i++)
-    box("Bridge plank", -2 + i * 0.48, 1, -21, 0.43, 0.2, 2.4, woodLight);
+    box(
+      "Bridge plank",
+      bridgeX - 3.6 + i * 0.48,
+      1,
+      -21,
+      0.43,
+      0.2,
+      2.4,
+      woodLight,
+    );
   for (const z of [-22.3, -19.7]) {
-    box("Bridge handrail", 1.4, 2, z, 7.6, 0.12, 0.12, wood);
-    for (let x = -2; x < 6; x += 2)
+    box("Bridge handrail", bridgeX - 0.2, 2, z, 7.6, 0.12, 0.12, wood);
+    for (let x = bridgeX - 3.6; x < bridgeX + 3.7; x += 1.8)
       box("Bridge post", x, 1.5, z, 0.17, 1.6, 0.17, wood);
   }
   const mushroom = mat("Mushroom", "#cb7163");
   for (let i = 0; i < 14; i++) {
-    let x = -29 + rnd() * 6,
+    const x = -29 + rnd() * 6,
       z = -12 + rnd() * 12;
     const y = landHeight(x, z);
     cyl("Mushroom stalk", x, y + 0.25, z, 0.1, 0.5, stone);
@@ -824,13 +894,14 @@ function createWorld(
   (tuft.material as StandardMaterial).backFaceCulling = false;
   tuft.isPickable = false;
   const grassMatrices: Matrix[] = [];
-  for (let n = 0; n < 1400; n++) {
+  for (let n = 0; n < (highQuality ? 4200 : 1600); n++) {
     const x = -50 + rnd() * 100,
       z = -45 + rnd() * 90,
       y = landHeight(x, z);
     if (
       y < 0.2 ||
-      HOME_POSITIONS.some((p) => Math.hypot(x - p[0], z - p[1]) < 4)
+      Math.abs(x - (3 + Math.sin(z * 0.075) * 8)) < 2.2 ||
+      HOME_POSITIONS.some((p) => Math.hypot(x - p[0], z - p[1]) < 5)
     )
       continue;
     const scale = 0.6 + rnd() * 0.7;
@@ -864,6 +935,60 @@ function createWorld(
       box("Fence rail", x + 0.3, y + 0.3, z, 0.8, 0.08, 0.09, wood);
     }
   }
+  // Worn lanes connect the settlements to the crossing and give the meadow scale.
+  const pathMaterial = mat("Old trade road", "#a5a17b");
+  pathMaterial.specularColor = Color3.Black();
+  for (const [homeX, homeZ] of HOME_POSITIONS) {
+    const banks: Vector3[][] = [[], []];
+    const riverX = 3 + Math.sin(homeZ * 0.075) * 8;
+    const destinationX = riverX + (homeX < riverX ? -2.6 : 2.6);
+    for (let step = 0; step <= 30; step++) {
+      const t = step / 30;
+      const x = homeX + (destinationX - homeX) * t;
+      const z = homeZ - 8 + Math.sin(t * Math.PI) * 2;
+      for (let side = 0; side < 2; side++) {
+        const edgeZ = z + (side ? 1 : -1) * (0.38 + Math.sin(t * 16) * 0.06);
+        banks[side].push(new Vector3(x, landHeight(x, edgeZ) + 0.035, edgeZ));
+      }
+    }
+    const lane = MeshBuilder.CreateRibbon(
+      "Worn lane",
+      { pathArray: banks, sideOrientation: Mesh.DOUBLESIDE },
+      scene,
+    );
+    lane.material = pathMaterial;
+    lane.receiveShadows = true;
+    lane.isPickable = false;
+  }
+
+  // Static scenery is batched once. Castle masonry stays individually destructible.
+  const sceneryGroups = new Map<StandardMaterial, Mesh[]>();
+  for (const mesh of scene.meshes.slice(sceneryStart)) {
+    if (
+      !(mesh instanceof Mesh) ||
+      mesh.thinInstanceCount ||
+      !mesh.material ||
+      !mesh.isVisible
+    )
+      continue;
+    const material = mesh.material as StandardMaterial;
+    const group = sceneryGroups.get(material) ?? [];
+    group.push(mesh);
+    sceneryGroups.set(material, group);
+    shadows.removeShadowCaster(mesh);
+  }
+  for (const [material, meshes] of sceneryGroups) {
+    const merged = Mesh.MergeMeshes(meshes, true, true);
+    if (!merged) continue;
+    merged.name = `Scenery / ${material.name}`;
+    merged.isPickable = false;
+    merged.receiveShadows = true;
+    merged.freezeWorldMatrix();
+    if (material !== pathMaterial) shadows.addShadowCaster(merged);
+  }
+  terrain.freezeWorldMatrix();
+  scene.skipPointerMovePicking = true;
+
   const banners: { mesh: Mesh; offset: number }[] = [];
   const fires: { mesh: Mesh; base: number }[] = [];
   function flag(
@@ -886,18 +1011,34 @@ function createWorld(
       undefined,
       5,
     );
-    const m = box(
+    const m = MeshBuilder.CreateGround(
       "Pennant",
-      x + 0.45 * scale,
-      y + 1.9 * scale,
-      z,
-      0.95 * scale,
-      0.58 * scale,
-      0.035,
-      mat(`Banner${color}`, color),
-      parent,
-      false,
+      {
+        width: 1.05 * scale,
+        height: 0.66 * scale,
+        subdivisions: 8,
+        updatable: true,
+      },
+      scene,
     );
+    const cloth = m.getVerticesData(VertexBuffer.PositionKind)!;
+    for (let v = 0; v < cloth.length; v += 3) {
+      const across = cloth[v] / (1.05 * scale) + 0.5;
+      const vertical = cloth[v + 2];
+      cloth[v] += 0.525 * scale;
+      cloth[v + 1] = -vertical;
+      cloth[v + 2] = Math.sin(across * 8) * across * 0.1 * scale;
+      if (across > 0.85)
+        cloth[v] -= (1 - Math.abs(vertical) / (0.33 * scale)) * 0.22 * scale;
+    }
+    m.setVerticesData(VertexBuffer.PositionKind, cloth);
+    const clothNormals: number[] = [];
+    VertexData.ComputeNormals(cloth, m.getIndices()!, clothNormals);
+    m.setVerticesData(VertexBuffer.NormalKind, clothNormals);
+    m.position.set(x, y + 1.9 * scale, z);
+    const bannerMaterial = mat(`Banner${color}`, color);
+    bannerMaterial.backFaceCulling = false;
+    meshSetup(m, bannerMaterial, parent, false);
     banners.push({ mesh: m, offset: rnd() * 10 });
   }
   function torch(parent: TransformNode, x: number, y: number, z: number) {
@@ -963,6 +1104,42 @@ function createWorld(
       grp,
     );
     b.rotation.z = -0.55;
+    const gableFace = new Mesh("Plaster gable", scene);
+    const gableData = new VertexData();
+    gableData.positions = [-1.85, 2.6, -1.52, 1.85, 2.6, -1.52, 0, 3.85, -1.52];
+    gableData.indices = [0, 2, 1];
+    gableData.normals = [0, 0, -1, 0, 0, -1, 0, 0, -1];
+    gableData.applyToMesh(gableFace);
+    meshSetup(gableFace, mat("Warm plaster", "#d6b993"), grp);
+    box("Gable kingpost", 0, 3.1, -1.6, 0.14, 1.25, 0.12, wood, grp);
+    box("Roof ridge cap", 0, 3.86, 0, 0.22, 0.18, 4.05, woodLight, grp);
+    for (const side of [-1, 1]) {
+      box(
+        "Window shutter",
+        -0.8 + side * 0.49,
+        1.65,
+        -1.62,
+        0.27,
+        0.78,
+        0.12,
+        roof,
+        grp,
+      );
+      box(
+        "Door jamb",
+        0.55 + side * 0.46,
+        0.78,
+        -1.68,
+        0.13,
+        1.6,
+        0.16,
+        woodLight,
+        grp,
+      );
+    }
+    box("Window sill", -0.8, 1.26, -1.72, 1.3, 0.13, 0.4, woodLight, grp);
+    box("Door lintel", 0.55, 1.59, -1.68, 1.05, 0.17, 0.16, woodLight, grp);
+    box("Doorstep", 0.55, 0.06, -1.96, 1.25, 0.12, 0.7, stone, grp);
     box("Door", 0.55, 0.75, -1.57, 0.75, 1.5, 0.1, wood, grp);
     box("Cottage window", -0.8, 1.65, -1.58, 0.62, 0.65, 0.11, windowMat, grp);
     box("Window bar", -0.8, 1.65, -1.65, 0.07, 0.7, 0.05, wood, grp);
@@ -998,6 +1175,15 @@ function createWorld(
     sphere("Doorknob", 0.8, 0.78, -1.7, 0.055, gold, grp);
     return grp;
   }
+  const realmLabels = new Map<
+    string,
+    {
+      button: HTMLButtonElement;
+      title: HTMLSpanElement;
+      health: HTMLSpanElement;
+      position: Vector3;
+    }
+  >();
   const castleRoots = new Map<string, TransformNode>();
   const castleKeys = new Map<string, string>();
   const castleHealth = new Map<string, number>();
@@ -1010,7 +1196,7 @@ function createWorld(
     const team = mat(`Team ${p.color}`, p.color);
     parent.metadata = { player: p.id };
     if (p.plot === null) return;
-    const soil = mat("Trodden earth", "#747957");
+    const soil = mat("Trodden earth", "#97946d");
     const patch = cyl(
       "Settlement earth",
       0,
@@ -1141,6 +1327,19 @@ function createWorld(
       ]) {
         cyl("Keep turret", x, height * 0.52, z, 2, height + 1.2, stone, parent);
         cyl("Turret hat", x, height + 1.6, z, 2.8, 2, roof, parent, 0);
+        for (const y of [0.3, height * 0.48, height + 0.45])
+          cyl("Turret stone belt", x, y, z, 2.18, 0.23, stone, parent);
+        box(
+          "Turret arrow slit",
+          x,
+          height - 0.5,
+          z - 1.015,
+          0.14,
+          0.82,
+          0.05,
+          dark,
+          parent,
+        );
         flag(parent, x, height + 2.4, z, p.color, 0.65);
       }
       torch(parent, -1.2, 1.7, -2.9);
@@ -1166,6 +1365,18 @@ function createWorld(
           const th = h + 1.1;
           cyl("Corner tower", x, th / 2, z, 2.1, th, stone, parent);
           cyl("Tower lip", x, th, z, 2.35, 0.4, stone, parent);
+          cyl("Tower plinth", x, 0.16, z, 2.42, 0.32, stone, parent);
+          box(
+            "Tower arrow slit",
+            x,
+            th * 0.64,
+            z - 1.06,
+            0.14,
+            0.65,
+            0.035,
+            dark,
+            parent,
+          );
           for (let n = 0; n < 8; n++) {
             const a = (n * Math.PI) / 4;
             box(
@@ -1382,7 +1593,6 @@ function createWorld(
   }
   let data = propsRef.current.game;
   let me = propsRef.current.me;
-  let chosen = propsRef.current.selection;
   let first = true;
   const reduceMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
@@ -1403,12 +1613,47 @@ function createWorld(
   function update(g: Game, myId: string, plot: number) {
     data = g;
     me = myId;
-    chosen = plot;
     const index = Math.max(
       0,
       g.players.findIndex((p) => p.id === myId),
     );
     const mine = g.players[index];
+    for (const [id, label] of realmLabels) {
+      if (!g.players.some((p) => p.id === id && p.plot !== null)) {
+        label.button.remove();
+        realmLabels.delete(id);
+      }
+    }
+    g.players.forEach((p, i) => {
+      if (p.plot === null) return;
+      let label = realmLabels.get(p.id);
+      if (!label) {
+        const button = document.createElement("button");
+        button.className = "realm-landmark";
+        const title = document.createElement("span");
+        const track = document.createElement("span");
+        track.className = "landmark-track";
+        const health = document.createElement("span");
+        track.appendChild(health);
+        button.appendChild(title);
+        button.appendChild(track);
+        button.addEventListener("click", () =>
+          propsRef.current.onSelectPlayer(p.id),
+        );
+        landmarks.appendChild(button);
+        label = { button, title, health, position: Vector3.Zero() };
+        realmLabels.set(p.id, label);
+      }
+      const pos = positionOf(p, i);
+      label.position.set(pos.x, 4 + p.buildings.keep * 2, pos.z);
+      label.title.textContent = p.castle;
+      label.button.setAttribute(
+        "aria-label",
+        `${p.castle}, ${p.hp} of ${p.maxHp} health. Focus stronghold`,
+      );
+      label.button.style.setProperty("--team-color", p.color);
+      label.health.style.width = `${Math.max(0, (p.hp / p.maxHp) * 100)}%`;
+    });
     g.players.forEach((p, i) => {
       const key = JSON.stringify([
         p.plot,
@@ -1432,6 +1677,11 @@ function createWorld(
         castleKeys.delete(id);
         castleHealth.delete(id);
       }
+    // Rebuilds dispose old castle props; prune their animation handles immediately.
+    for (let i = banners.length - 1; i >= 0; i--)
+      if (banners[i].mesh.isDisposed()) banners.splice(i, 1);
+    for (let i = fires.length - 1; i >= 0; i--)
+      if (fires[i].mesh.isDisposed()) fires.splice(i, 1);
     const base = HOME_POSITIONS[index];
     heroTarget = new Vector3(
       base[0] + CLEARINGS[plot].offset[0],
@@ -1568,16 +1818,33 @@ function createWorld(
   canvas.addEventListener("pointercancel", onCancel);
   window.addEventListener("pointerup", onUp);
   window.addEventListener("blur", taps.reset);
-  const resize = () => engine.resize();
+  const resize = () => {
+    resizeResolution();
+    engine.resize();
+  };
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   let time = 0;
   let disposed = false;
+  let weatherBlend = 0;
+  let labelTick = 0;
+  let diagnosticTick = 0;
+  const projectionIdentity = Matrix.Identity();
   engine.runRenderLoop(() => {
     if (document.hidden) return;
     const dt = Math.min(0.05, engine.getDeltaTime() / 1000);
     if (!reduceMotion) time += dt;
     landingTime += dt;
+    weatherBlend +=
+      ((data.weather === 2 ? 1 : 0) - weatherBlend) * Math.min(1, dt * 0.6);
+    waterMaterial.setFloat("time", time);
+    waterMaterial.setFloat("rain", weatherBlend);
+    waterMaterial.setVector3("eye", camera.globalPosition);
+    skyMaterial.setFloat("time", time);
+    skyMaterial.setFloat("rain", weatherBlend);
+    sun.intensity = 1.2 - weatherBlend * 0.75;
+    scene.fogDensity = 0.0045 + weatherBlend * 0.003;
+
     if (cameraGoal) {
       camera.target = Vector3.Lerp(
         camera.target,
@@ -1618,8 +1885,8 @@ function createWorld(
       }
     });
     fireflies.forEach((m, n) => {
-      m.position.y += Math.sin(time + n) * 0.002;
-      m.position.x += Math.sin(time * 0.7 + n) * 0.003;
+      m.position.y += Math.sin(time + n) * dt * 0.12;
+      m.position.x += Math.sin(time * 0.7 + n) * dt * 0.18;
     });
     if (battleState) {
       const b = battleState;
@@ -1649,6 +1916,17 @@ function createWorld(
         propsRef.current.onBattleEnd();
       }
     }
+    for (let i = impactWaves.length - 1; i >= 0; i--) {
+      const wave = impactWaves[i];
+      wave.age += dt;
+      wave.mesh.scaling.setAll(1 + wave.age * 12);
+      wave.material.alpha = Math.max(0, 0.65 * (1 - wave.age / 0.8));
+      if (wave.age > 0.8) {
+        wave.mesh.dispose();
+        wave.material.dispose();
+        impactWaves.splice(i, 1);
+      }
+    }
     for (let n = staticColliders.length - 1; n >= 0; n--) {
       const c = staticColliders[n];
       c.age += dt;
@@ -1662,7 +1940,7 @@ function createWorld(
       r.age += dt;
       if (r.age > 10 && r.aggregate) {
         r.aggregate.dispose();
-        r.aggregate = null as unknown as PhysicsAggregate;
+        r.aggregate = null;
         r.mesh.freezeWorldMatrix();
       }
     }
@@ -1677,7 +1955,43 @@ function createWorld(
         debris.splice(i, 1);
       }
     }
+    scene.physicsEnabled = physicalRubble.some((r) => r.aggregate !== null);
     scene.render();
+    labelTick += dt;
+    diagnosticTick += dt;
+    if (labelTick > 0.05) {
+      labelTick = 0;
+      const viewport = camera.viewport.toGlobal(
+        canvas.clientWidth,
+        canvas.clientHeight,
+      );
+      for (const label of realmLabels.values()) {
+        const screen = Vector3.Project(
+          label.position,
+          projectionIdentity,
+          scene.getTransformMatrix(),
+          viewport,
+        );
+        const visible =
+          !battleState &&
+          camera.radius > 45 &&
+          screen.z > 0 &&
+          screen.z < 1 &&
+          screen.x > 30 &&
+          screen.x < canvas.clientWidth - 30 &&
+          screen.y > 35 &&
+          screen.y < canvas.clientHeight - 25;
+        label.button.hidden = !visible;
+        if (visible)
+          label.button.style.transform = `translate(${screen.x}px, ${screen.y}px) translate(-50%, -100%)`;
+      }
+    }
+    if (diagnosticTick > 1) {
+      diagnosticTick = 0;
+      canvas.dataset.fps = String(Math.round(engine.getFps()));
+      canvas.dataset.activeMeshes = String(scene.getActiveMeshes().length);
+      canvas.dataset.quality = highQuality ? "high" : "low";
+    }
   });
   update(
     propsRef.current.game,
@@ -1694,6 +2008,7 @@ function createWorld(
     dispose: () => {
       disposed = true;
       observer.disconnect();
+      landmarks.replaceChildren();
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointercancel", onCancel);
@@ -1710,23 +2025,36 @@ function createWorld(
 }
 export default function World(props: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const landmarks = useRef<HTMLDivElement>(null);
   const runtime = useRef<Runtime | null>(null);
   const propsRef = useRef(props);
-  propsRef.current = props;
+  useEffect(() => {
+    propsRef.current = props;
+  });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   useEffect(() => {
-    if (!canvas.current) return;
+    if (!canvas.current || !landmarks.current) return;
+    let active = true;
     try {
-      runtime.current = createWorld(canvas.current, propsRef, () =>
-        setLoaded(true),
+      runtime.current = createWorld(
+        canvas.current,
+        propsRef,
+        landmarks.current,
+        () => setLoaded(true),
       );
     } catch (e) {
       console.error("3D world failed", e);
-      setError(true);
+      queueMicrotask(() => {
+        if (active) setError(true);
+      });
     }
-    return () => runtime.current?.dispose();
-  }, [props.quality]);
+    return () => {
+      active = false;
+      runtime.current?.dispose();
+      runtime.current = null;
+    };
+  }, []);
   useEffect(
     () => runtime.current?.update(props.game, props.me, props.selection),
     [props.game, props.me, props.selection],
@@ -1743,6 +2071,11 @@ export default function World(props: Props) {
         ref={canvas}
         aria-label="Interactive 3D kingdom. Drag to orbit, pinch or scroll to zoom; tap clearings or rival castles. Camera buttons are also available."
         tabIndex={0}
+      />
+      <div
+        ref={landmarks}
+        className="realm-landmarks"
+        aria-label="Strongholds on the realm map"
       />
       {!loaded && !error && (
         <div className="world-loading">

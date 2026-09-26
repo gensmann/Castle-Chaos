@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Castle, ArrowLeft } from "lucide-react";
 import PlayerGuide from "@/components/player-guide";
@@ -12,9 +13,9 @@ export default function GuidePage() {
   return (
     <main className="guide-page">
       <div className="guide-page-inner">
-        <a className="guide-back" href="/">
+        <Link className="guide-back" href="/">
           <ArrowLeft size={18} /> Play Castle Chaos
-        </a>
+        </Link>
         <header>
           <Castle size={36} />
           <span className="eyebrow">CASTLE CHAOS · HOW TO PLAY</span>

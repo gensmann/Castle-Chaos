@@ -55,7 +55,9 @@ Multiplayer synchronizes authoritative outcomes through short polling (2.5–4 s
 
 Generated source art and exact generation prompts are in `assets/masters/`, `assets/art-prompts.json`, and `assets/extra-texture-prompts.json`. The available built-in image generator was used; it did not expose an Imagen 2.5 model selector. `public/art/` contains compressed WebP derivatives. No video is used for gameplay or attacks.
 
-The 3D engine loads separately from the interface. Deep module imports, instanced masonry/vegetation, a capped device pixel ratio, bounded physics bodies, hidden-tab suspension and a lower-shadow performance setting control rendering costs. Reduced-motion preferences skip automatic siege replays. Audio starts only after a user's sound toggle.
+The world combines generated stone, timber and roof textures with deterministic painted meadow/foliage textures and original SVG building miniatures. `components/world-atmosphere.ts` supplies a procedural sky and animated water with analytic reflection, avoiding a second scene render. The river has a carved bed, trade paths connect the clearings, and the overview shows clickable castle names and health bars. Rain blends the sky, sunlight and fog. Buildings include gables, shutters, door trim, cloth pennants and turret details.
+
+The 3D engine loads separately from the interface. Static props are merged by material; vegetation and masonry remain instanced. High quality renders at up to 1.6 device pixels per CSS pixel, Performance at 1, with fewer grass instances and a smaller shadow/glow budget. Resolution follows canvas resizing. Physics pauses when no rubble bodies are active; Havok initialization and the audio context are reused. Disposed animation and shadow handles are pruned after rebuilds. Reduced-motion preferences skip automatic siege replays and stop ambient animation. Audio starts only after a user's sound toggle. The canvas exposes `data-fps`, `data-active-meshes`, `data-quality` and `data-physics` for lightweight diagnostics; these are current samples, not benchmark results.
 
 ### Mobile controls and verification
 
@@ -64,6 +66,8 @@ The layout follows the dynamic viewport and device safe areas. Compact touch lay
 Drag the scene to orbit, pinch to zoom, or use the camera buttons. Before settling, tap a clearing or its card to move the Borg Meister. Pointer tracking prevents orbiting, pinching and cancelled touches from also selecting a plot. `check:controls` exercises those gesture boundaries.
 
 Verified on 22 September 2026 in desktop Safari's responsive mode at 375×667 and 667×375: choose land, settle, build the guide's three purchases, end turn, attack and scroll the English guide. Chromium viewport checks also cover 390×664, 844×390 and 375×548, including the visitors panel and Havok initialization. These are browser and viewport checks; physical iPhone touch gestures, sustained performance and thermal behaviour have not been measured.
+
+Verified again on 26 September 2026 in the local production Worker: cold 3D/Havok initialization, settlement, timber hall and quarry construction, stone-keep upgrade, bot attacks and rubble, weather transitions, and camera controls. Development-browser checks also covered a player siege, overview labels, High/Performance switching, and portrait/landscape mobile layouts. These checks do not establish performance on physical phones or a multiplayer load benchmark.
 
 Useful primary references: [Babylon.js](https://www.babylonjs.com/), [Havok integration](https://github.com/BabylonJS/havok), [Babylon physics documentation](https://doc.babylonjs.com/features/featuresDeepDive/physics/).
 

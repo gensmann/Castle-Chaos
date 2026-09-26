@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import {
   Castle,
   Swords,
@@ -21,26 +22,21 @@ import {
   ArrowUpRight,
   Plus,
   Minus,
-  Maximize,
   Compass,
   Volume2,
   VolumeX,
-  Settings,
   HelpCircle,
   Flag,
   Wind,
   Sun,
   CloudRain,
-  DoorOpen,
   Copy,
   Check,
   Globe2,
   RotateCcw,
   LoaderCircle,
   Tent,
-  MapPin,
   Footprints,
-  Gem,
   Wine,
   Mail,
   X,
@@ -84,6 +80,7 @@ import {
 } from "@/lib/game";
 import type { WorldCommand } from "./world";
 import PlayerGuide from "./player-guide";
+import BuildingArt from "./building-art";
 const World = dynamic(() => import("./world"), {
   ssr: false,
   loading: () => (
@@ -98,13 +95,6 @@ type GameResponse = {
   me: string;
   revision: number;
   error?: string;
-};
-const BUILD_ICONS: Record<Building, LucideIcon> = {
-  keep: Castle,
-  walls: Shield,
-  workshop: Hammer,
-  tavern: Wine,
-  quarry: Mountain,
 };
 const WEAPON_ICONS: Record<Weapon, LucideIcon> = {
   trebuchet: Crosshair,
@@ -198,6 +188,7 @@ function Health({ player }: { player: Player }) {
     </div>
   );
 }
+let audioContext: AudioContext | null = null;
 function sound(
   kind: "click" | "launch" | "impact" | "build" | "turn",
   enabled: boolean,
@@ -208,7 +199,8 @@ function sound(
       window.AudioContext ??
       (window as unknown as { webkitAudioContext: typeof AudioContext })
         .webkitAudioContext;
-    const ctx = new Ctx();
+    const ctx = (audioContext ??= new Ctx());
+    if (ctx.state === "suspended") void ctx.resume().catch(() => {});
     const gain = ctx.createGain();
     gain.gain.value = 0.075;
     gain.connect(ctx.destination);
@@ -232,7 +224,10 @@ function sound(
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
     osc.start();
     osc.stop(ctx.currentTime + 0.5);
-    osc.onended = () => void ctx.close();
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
   } catch {}
 }
 
@@ -269,10 +264,12 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   const busyRef = useRef(false);
   const gameRef = useRef<Game | null>(null);
   const soundRef = useRef(false);
-  soundRef.current = soundOn;
-  gameRef.current = game;
+  useEffect(() => {
+    soundRef.current = soundOn;
+    gameRef.current = game;
+  }, [soundOn, game]);
   const commandWorld = (kind: WorldCommand["kind"], id?: string) =>
-    setCommand({ kind, id, nonce: Date.now() });
+    setCommand((previous) => ({ kind, id, nonce: (previous?.nonce ?? 0) + 1 }));
   const displayGame = useCallback((g: Game, initial = false) => {
     if (initial) {
       g.events.forEach((e) => seen.current.add(e.id));
@@ -328,6 +325,8 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
     [displayGame],
   );
   useEffect(() => {
+    // Browser preferences and the initial local realm are synchronized after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     const touchDevice = window.matchMedia("(pointer: coarse)").matches;
     let preferredQuality: "high" | "low" = touchDevice ? "low" : "high";
@@ -381,7 +380,11 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     const impact = () => sound("impact", soundRef.current);
     document.addEventListener("siege-impact", impact, true);
-    return () => document.removeEventListener("siege-impact", impact, true);
+    return () => {
+      document.removeEventListener("siege-impact", impact, true);
+      if (audioContext) void audioContext.close().catch(() => {});
+      audioContext = null;
+    };
   }, []);
   const finishBattle = useCallback(() => {
     if (queue.current.length) {
@@ -469,9 +472,12 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
         setDialog(null);
         return;
       }
-      window.location.href =
+      // Authentication is a server redirect, so it requires a document navigation.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(
         "/signin-with-chatgpt?return_to=" +
-        encodeURIComponent(roomCode ? `/?join=${roomCode}` : "/");
+          encodeURIComponent(roomCode ? `/?join=${roomCode}` : "/"),
+      );
       return;
     }
     busyRef.current = true;
@@ -589,13 +595,13 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
     >
       <Toaster position="top-center" theme="dark" closeButton richColors />
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Castle Chaos home">
+        <Link className="brand" href="/" aria-label="Castle Chaos home">
           <Castle strokeWidth={1.4} />
           <span>
             CASTLE<b>CHAOS</b>
           </span>
           <small>A MOST UNCIVILISED SIEGE</small>
-        </a>
+        </Link>
         <div className="treasury" aria-label="Your resources">
           {(["gold", "wood", "stone"] as Resource[]).map((r) => {
             const Icon = resIcons[r];
@@ -655,6 +661,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
       </header>
       <div className="world-stage">
         <World
+          key={quality}
           game={game}
           me={me}
           selection={selection}
@@ -1240,8 +1247,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
           ) : tab === "build" ? (
             <div className="build-grid">
               {(Object.keys(BUILDINGS) as Building[]).map((b) => {
-                const Icon = BUILD_ICONS[b],
-                  level = mine.buildings[b],
+                const level = mine.buildings[b],
                   cost = buildCost(mine, b);
                 return (
                   <button
@@ -1252,7 +1258,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
                     onClick={() => void send({ type: "build", building: b })}
                   >
                     <span className="build-art">
-                      <Icon size={36} strokeWidth={1.25} />
+                      <BuildingArt kind={b} />
                       <span>
                         {[0, 1, 2].map((i) => (
                           <i className={i < level ? "lit" : ""} key={i} />
@@ -1285,8 +1291,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
           ) : tab === "weapons" ? (
             <div className="weapon-grid">
               {(Object.keys(WEAPONS) as Weapon[]).map((w) => {
-                const Icon = WEAPON_ICONS[w],
-                  level = mine.weapons[w],
+                const level = mine.weapons[w],
                   cost = craftCost(mine, w),
                   locked =
                     mine.buildings.workshop <
@@ -1306,7 +1311,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
                     onClick={() => void send({ type: "craft", weapon: w })}
                   >
                     <span className="build-art">
-                      <Icon size={38} strokeWidth={1.2} />
+                      <BuildingArt kind={w} />
                       <span>
                         {[0, 1, 2].map((i) => (
                           <i className={i < level ? "lit" : ""} key={i} />
@@ -1776,7 +1781,10 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
                 <span>
                   <Sparkles size={18} />
                   Graphics quality
-                  <small>Lower shadows for smaller devices.</small>
+                  <small>
+                    High: crisp detail and rich vegetation. Performance: fewer
+                    pixels and lighter shadows.
+                  </small>
                 </span>
                 <button
                   className="outline-button"
