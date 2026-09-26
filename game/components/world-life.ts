@@ -4,27 +4,26 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Scene } from "@babylonjs/core/scene";
-import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import { createCharacterSprites } from "./character-sprites";
+import { inIsometricView, type DetailLevel } from "@/lib/isometric-view";
+import type { MapPoint } from "@/lib/isometric-view";
 
-/** Small articulated rigs; static body details are merged, only joints animate. */
-export function createWorldLife(
-  scene: Scene,
-  shadows: ShadowGenerator,
-  high: boolean,
-) {
+/** Painted characters plus lightweight ambient effects, culled and throttled by LOD. */
+export function createWorldLife(scene: Scene, high: boolean) {
   const material = (name: string, color: string) => {
     const m = new StandardMaterial(name, scene);
     m.diffuseColor = Color3.FromHexString(color);
     m.specularColor = Color3.Black();
     return m;
   };
-  const skin = material("Warm skin", "#ddb289");
-  const boots = material("Leather boots", "#383f35");
-  const linen = material("Linen trousers", "#a69973");
-  const brass = material("Crown brass", "#e4c66e");
-  const hair = material("Chestnut hair", "#624634");
-  const ivory = material("Eye ivory", "#ece3c9");
-  const cloaks = new Map<string, StandardMaterial>();
+  const boots = material("Swallow feathers", "#383f35");
+  const characters = createCharacterSprites(scene);
+  const character = characters.character;
+  let level: DetailLevel = "near";
+  let center: MapPoint = { x: 0, y: 0, z: 0 };
+  let span = 30,
+    aspect = 1,
+    ambientTime = 0;
   const smokeMat = material("Hearth smoke", "#bdc2b1");
   smokeMat.alpha = 0.13;
   smokeMat.disableLighting = true;
@@ -89,166 +88,6 @@ export function createWorldLife(
     node.position.set(x, y, z);
     return node;
   }
-  function character(
-    name: string,
-    color: string,
-    royal = false,
-    parent?: TransformNode,
-    activity: "none" | "carry" | "hammer" = "none",
-  ) {
-    const root = new TransformNode(name, scene);
-    root.parent = parent ?? null;
-    const body = joint("Spine", root, 0, 0.9, 0);
-    const head = joint("Neck", body, 0, 0.65, 0);
-    if (!cloaks.has(color))
-      cloaks.set(color, material(`Cloth ${color}`, color));
-    const cloth = cloaks.get(color)!;
-    part("Tunic", body, 0, 0.12, 0, 0.62, 0.82, 0.38, cloth, true);
-    part("Belt", body, 0, -0.13, 0, 0.62, 0.09, 0.4, boots);
-    part("Buckle", body, 0, -0.13, -0.22, 0.13, 0.13, 0.06, brass);
-    part("Head", head, 0, 0, 0, 0.52, 0.6, 0.48, skin, true);
-    part("Hair", head, 0, 0.18, 0.03, 0.55, 0.26, 0.47, hair, true);
-    for (const side of [-1, 1]) {
-      part(
-        "Eye",
-        head,
-        side * 0.12,
-        0.04,
-        -0.23,
-        0.12,
-        0.13,
-        0.07,
-        ivory,
-        true,
-      );
-      part(
-        "Pupil",
-        head,
-        side * 0.12,
-        0.04,
-        -0.27,
-        0.052,
-        0.067,
-        0.03,
-        boots,
-        true,
-      );
-    }
-    part("Nose", head, 0, -0.06, -0.27, 0.15, 0.16, 0.16, skin, true);
-    if (royal) {
-      part("Moustache", head, 0, -0.17, -0.24, 0.34, 0.09, 0.1, hair, true);
-      const crown = MeshBuilder.CreateCylinder(
-        "Crown",
-        { diameter: 0.59, height: 0.18, tessellation: 10 },
-        scene,
-      );
-      crown.parent = head;
-      crown.position.y = 0.3;
-      crown.material = brass;
-      crown.isPickable = false;
-      for (let i = 0; i < 5; i++) {
-        const a = (i * Math.PI * 2) / 5;
-        part(
-          "Crown point",
-          head,
-          Math.sin(a) * 0.25,
-          0.46,
-          Math.cos(a) * 0.25,
-          0.085,
-          0.23,
-          0.085,
-          brass,
-        );
-      }
-    }
-    const arms: TransformNode[] = [],
-      elbows: TransformNode[] = [],
-      hips: TransformNode[] = [],
-      knees: TransformNode[] = [];
-    for (const side of [-1, 1]) {
-      const arm = joint("Shoulder", body, side * 0.4, 0.42, 0);
-      part("Sleeve", arm, 0, -0.18, 0, 0.22, 0.42, 0.25, cloth, true);
-      const elbow = joint("Elbow", arm, 0, -0.35, 0);
-      part("Forearm", elbow, 0, -0.15, 0, 0.17, 0.3, 0.19, cloth, true);
-      part("Hand", elbow, 0, -0.32, -0.01, 0.18, 0.2, 0.19, skin, true);
-      arm.rotation.z = side * 0.13;
-      const hip = joint("Hip", root, side * 0.18, 0.77, 0);
-      part("Thigh", hip, 0, -0.16, 0, 0.24, 0.37, 0.26, linen, true);
-      const knee = joint("Knee", hip, 0, -0.32, 0);
-      part("Shin", knee, 0, -0.15, 0, 0.18, 0.34, 0.2, linen, true);
-      part("Boot", knee, 0, -0.34, -0.075, 0.25, 0.23, 0.4, boots);
-      arms.push(arm);
-      elbows.push(elbow);
-      hips.push(hip);
-      knees.push(knee);
-    }
-    if (activity === "carry") {
-      part("Supply crate", body, 0, -0.05, -0.54, 0.56, 0.42, 0.45, hair);
-      part("Crate strap", body, 0, -0.05, -0.78, 0.07, 0.42, 0.025, brass);
-    } else if (activity === "hammer") {
-      part("Hammer haft", elbows[1], 0, -0.47, -0.1, 0.08, 0.4, 0.08, hair);
-      part("Hammer head", elbows[1], 0, -0.67, -0.1, 0.35, 0.17, 0.19, boots);
-    }
-    // Merge each rigid part separately, retaining the articulated joint hierarchy.
-    for (const node of [body, head, ...arms, ...elbows, ...hips, ...knees]) {
-      const pieces = node.getChildMeshes(true) as Mesh[];
-      if (pieces.length < 2) continue;
-      root.computeWorldMatrix(true);
-      pieces.forEach((p) => p.computeWorldMatrix(true));
-      const merged = Mesh.MergeMeshes(
-        pieces,
-        true,
-        true,
-        undefined,
-        false,
-        true,
-      )!;
-      merged.setParent(node);
-      merged.isPickable = false;
-    }
-    if (royal || high)
-      root.getChildMeshes().forEach((m) => {
-        shadows.addShadowCaster(m);
-        m.onDisposeObservable.addOnce(() => shadows.removeShadowCaster(m));
-      });
-    let stride = 0;
-    let walking = 0;
-    return {
-      root,
-      tick(time: number, dt: number, speed: number, landing = 0) {
-        // Stride follows distance travelled so feet don't cycle while stationary.
-        stride += speed * dt * 4.4;
-        walking += (Math.min(1, speed / 2.2) - walking) * Math.min(1, dt * 12);
-        const gait = Math.sin(stride);
-        body.position.y =
-          0.9 + Math.abs(Math.cos(stride)) * 0.035 * walking - landing * 0.2;
-        body.rotation.x = -walking * 0.06 + landing * 0.2;
-        body.rotation.z = gait * 0.035 * walking;
-        body.scaling.y = 1 + Math.sin(time * 2.2) * 0.008 * (1 - walking);
-        head.rotation.y = Math.sin(time * 0.6) * 0.1 * (1 - walking);
-        head.rotation.x = Math.sin(time * 1.5) * 0.025;
-        hips.forEach((hip, i) => {
-          const phase = stride + i * Math.PI;
-          hip.rotation.x = Math.sin(phase) * 0.55 * walking - landing * 0.22;
-          knees[i].rotation.x =
-            -Math.max(0, Math.cos(phase)) * 0.8 * walking + landing * 0.55;
-          arms[i].rotation.x = -Math.sin(phase) * 0.4 * walking - 0.04;
-          elbows[i].rotation.x =
-            -0.2 - Math.max(0, -Math.sin(phase)) * 0.22 * walking;
-          if (activity === "carry") {
-            arms[i].rotation.x = 0.85;
-            elbows[i].rotation.x = 0.8;
-          }
-        });
-        if (activity === "hammer") {
-          const stroke = Math.max(0, Math.sin(time * 3.4));
-          arms[1].rotation.x = 0.65 + stroke * 1.6;
-          elbows[1].rotation.x = 0.4 + stroke * 0.4;
-          body.rotation.x = -stroke * 0.08;
-        }
-      },
-    };
-  }
   function smoke(parent: TransformNode, x: number, y: number, z: number) {
     const puffs = Array.from({ length: high ? 5 : 3 }, (_, i) => {
       const puff = smokeSource.createInstance(`Hearth puff ${i}`);
@@ -259,7 +98,7 @@ export function createWorldLife(
     emitters.push({ parent, puffs, x, y, z, offset: emitters.length * 0.37 });
   }
   function village(parent: TransformNode, color: string, workshop: boolean) {
-    for (let i = 0; i < (high ? 2 : 1); i++) {
+    for (let i = 0; i < (high || workshop ? 2 : 1); i++) {
       const rig = character(
         "Courtyard villager",
         i ? "#77928a" : color,
@@ -300,14 +139,40 @@ export function createWorldLife(
     character,
     smoke,
     village,
+    setView(
+      detail: DetailLevel,
+      target: MapPoint,
+      viewSpan: number,
+      viewAspect: number,
+    ) {
+      level = detail;
+      center = target;
+      span = viewSpan;
+      aspect = viewAspect;
+      characters.setView(detail, target, viewSpan, viewAspect);
+    },
     update(time: number, dt: number, reduced: boolean) {
+      ambientTime += dt;
+      const refreshAmbient = ambientTime >= (level === "near" ? 1 / 20 : 1 / 8);
+      if (refreshAmbient) ambientTime = 0;
       for (let i = emitters.length - 1; i >= 0; i--) {
         const e = emitters[i];
         if (e.parent.isDisposed()) {
           emitters.splice(i, 1);
           continue;
         }
+        const visible =
+          level !== "far" &&
+          inIsometricView(
+            e.parent.getAbsolutePosition(),
+            center,
+            span,
+            aspect,
+            8,
+          );
         e.puffs.forEach((puff, j) => {
+          puff.setEnabled(visible && (level === "near" || j === 0));
+          if (!visible || !refreshAmbient) return;
           const age =
             ((reduced ? 0 : time * 0.16) + j / e.puffs.length + e.offset) % 1;
           puff.position.set(
@@ -346,7 +211,8 @@ export function createWorldLife(
         );
       }
       birds.forEach((bird) => {
-        bird.root.setEnabled(!reduced);
+        bird.root.setEnabled(!reduced && level === "near");
+        if (reduced || level !== "near" || !refreshAmbient) return;
         const phase = time * 0.085 + bird.phase;
         bird.root.position.set(
           Math.cos(phase) * 30,

@@ -7,6 +7,7 @@ import { HOME_POSITIONS, CLEARINGS, positionOf } from "@/lib/game";
 import { createWaterMaterial } from "./world-atmosphere";
 import { createIsometricCamera } from "./isometric-camera";
 import { createWorldLife } from "./world-life";
+import { detailLevel, type DetailLevel } from "@/lib/isometric-view";
 import { villageTexture } from "./world-materials";
 import { createVillageSprites, type VillageSprite } from "./world-sprites";
 import "@babylonjs/core/Engines/Extensions/engine.dynamicTexture";
@@ -134,7 +135,10 @@ function createWorld(
   shadows.normalBias = 0.035;
   sun.shadowMinZ = 1;
   sun.shadowMaxZ = 150;
-  const life = createWorldLife(scene, shadows, highQuality);
+  const life = createWorldLife(scene, highQuality);
+  let lod: DetailLevel = "near";
+  const closeDetails: Mesh[] = [];
+  const mediumDetails: Mesh[] = [];
   const sprites = createVillageSprites(scene);
   if (highQuality) {
     const glow = new GlowLayer("Torchglow", scene, {
@@ -803,6 +807,7 @@ function createWorld(
   tuft.thinInstanceAdd(grassMatrices);
   tuft.thinInstanceRefreshBoundingInfo(true);
   tuft.receiveShadows = true;
+  closeDetails.push(tuft);
   // Weathered fence marks an old farm, long before anyone thought to wear a crown.
   for (let n = 0; n < 13; n++) {
     const x = -32 + n * 0.65,
@@ -872,6 +877,8 @@ function createWorld(
     const merged = Mesh.MergeMeshes(meshes, true, true);
     if (!merged) continue;
     merged.name = `Scenery / ${material.name}`;
+    if (flowerMats.includes(material) || material === mushroom)
+      closeDetails.push(merged);
     merged.isPickable = false;
     merged.receiveShadows = true;
     merged.freezeWorldMatrix();
@@ -1362,6 +1369,7 @@ function createWorld(
       pieces.forEach((piece) => piece.computeWorldMatrix(true));
       const merged = Mesh.MergeMeshes(pieces, true, true)!;
       merged.name = `Castle detail / ${material.name}`;
+      mediumDetails.push(merged);
       merged.setParent(parent);
       merged.receiveShadows = true;
       shadows.addShadowCaster(merged);
@@ -1656,6 +1664,22 @@ function createWorld(
     scene.fogDensity = 0.0012 + weatherBlend * 0.0018;
 
     view.update(dt);
+    lod = detailLevel(canvas.clientHeight / view.span, lod);
+    life.setView(
+      lod,
+      camera.target,
+      view.span,
+      canvas.clientWidth / Math.max(1, canvas.clientHeight),
+    );
+    for (const [meshes, visible] of [
+      [closeDetails, lod === "near"],
+      [mediumDetails, lod !== "far"],
+    ] as const) {
+      for (let i = meshes.length - 1; i >= 0; i--) {
+        if (meshes[i].isDisposed()) meshes.splice(i, 1);
+        else meshes[i].setEnabled(visible);
+      }
+    }
     let landingSquash = 0;
     if (landingTime < 1.65) {
       hero.position.y = 0.8 + Math.max(0, 24 - 16 * landingTime * landingTime);
@@ -1697,6 +1721,7 @@ function createWorld(
     });
     banners.forEach((b) => {
       if (b.mesh.isDisposed()) return;
+      if (lod === "far" || reduceMotion) return;
       for (let i = 0; i < b.positions.length; i += 3) {
         const distance = b.rest[i];
         b.positions[i + 2] =
@@ -1712,6 +1737,8 @@ function createWorld(
       }
     });
     fireflies.forEach((m, n) => {
+      m.setEnabled(lod === "near");
+      if (lod !== "near") return;
       m.position.y += Math.sin(time + n) * (reduceMotion ? 0 : dt) * 0.12;
       m.position.x += Math.sin(time * 0.7 + n) * (reduceMotion ? 0 : dt) * 0.18;
     });
@@ -1829,6 +1856,8 @@ function createWorld(
       canvas.dataset.fps = String(Math.round(engine.getFps()));
       canvas.dataset.activeMeshes = String(scene.getActiveMeshes().length);
       canvas.dataset.quality = highQuality ? "high" : "low";
+      canvas.dataset.lod = lod;
+      canvas.dataset.characters = "sprites";
     }
   });
   update(

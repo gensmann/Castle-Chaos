@@ -35,3 +35,30 @@ export function fitIsometric(points: MapPoint[], aspect: number, margin = 8) {
     span: Math.max(maxY - minY, (maxX - minX) / Math.max(0.1, aspect)),
   };
 }
+
+export type DetailLevel = "near" | "middle" | "far";
+
+/** Orthographic distance does not change apparent size; zoom and viewport do. */
+export function detailLevel(
+  pixelsPerUnit: number,
+  previous: DetailLevel,
+): DetailLevel {
+  if (previous === "near" && pixelsPerUnit >= 12) return "near";
+  if (previous === "far" && pixelsPerUnit <= 8) return "far";
+  return pixelsPerUnit >= 15 ? "near" : pixelsPerUnit <= 6 ? "far" : "middle";
+}
+
+export function inIsometricView(
+  point: MapPoint,
+  target: MapPoint,
+  span: number,
+  aspect: number,
+  margin = 4,
+) {
+  const p = projectIsometric(point);
+  const center = projectIsometric(target);
+  return (
+    Math.abs(p.x - center.x) < (span * aspect) / 2 + margin &&
+    Math.abs(p.y - center.y) < span / 2 + margin
+  );
+}

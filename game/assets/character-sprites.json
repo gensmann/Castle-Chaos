@@ -1,0 +1,13 @@
+{
+  "generator": "Built-in image_gen",
+  "prompt": "Use case: stylized-concept. Asset type: production 2D game character sprite animation atlas, transparent RGBA background. Create exactly 12 separate full-body character sprites in a precisely aligned regular 4-column by 3-row grid, each cell equal size, no borders, no text. Cozy hand-painted late-1990s isometric medieval settlement game aesthetic, rich pixel-readable detailing, warm natural colors, crisp silhouettes, original characters. Orthographic camera looking down at about 35 degrees; every character faces screen-right in three-quarter profile. Row 1: same friendly stout moustached king with small gold crown, rust-orange tunic, dark leather boots and short teal cape in four sequential walk-cycle poses (left foot forward, passing, right foot forward, passing). Row 2: same village porter in sage green tunic, cream trousers and brown cap, holding a wooden supply crate, four sequential walk poses. Row 3: same village craftswoman with auburn hair, ochre apron over blue tunic, brown boots, hammer in right hand, four sequential hammer-work poses (raised, descending, strike, recovery), no anvil or other scenery. Preserve identity, outfit, proportions and scale perfectly across each row. Exactly one figure per cell centered horizontally; all feet land on the same baseline 88 percent down each cell; all crowns/hammers fit with at least 8 percent transparent margin. Each figure occupies about 70 percent of cell height, no cropping. Flat 2D painted game sprites with baked highlights and shading, no 3D rendering, no floor, no drop shadows, no background, no labels, no watermark. Actual transparent background.",
+  "master": "masters/isometric-characters.png",
+  "runtime": "/art/isometric-characters.webp",
+  "width": 1448,
+  "height": 1086,
+  "columns": 4,
+  "rows": ["king_walk", "porter_walk", "craftswoman_hammer"],
+  "facing": "screen-right; mirrored for screen-left",
+  "framesPerRow": 4,
+  "compression": "cwebp -q 88 -alpha_q 100 -m 6"
+}

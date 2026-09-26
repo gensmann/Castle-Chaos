@@ -97,3 +97,20 @@ near(center.y, projectIsometric(point).y);
 console.log(
   "Isometric controls checked: screen-to-ground axes, focus, portrait and landscape realm framing.",
 );
+
+// A fixed orthographic camera needs screen-size LOD, with hysteresis at boundaries.
+const { detailLevel, inIsometricView } =
+  await import("../lib/isometric-view.ts");
+assert.equal(detailLevel(20, "far"), "near");
+assert.equal(detailLevel(13, "near"), "near");
+assert.equal(detailLevel(13, "middle"), "middle");
+assert.equal(detailLevel(7, "far"), "far");
+assert.equal(detailLevel(7, "middle"), "middle");
+assert.equal(detailLevel(4, "near"), "far");
+const origin = { x: 0, y: 0, z: 0 };
+assert.equal(inIsometricView(origin, origin, 30, 1), true);
+assert.equal(inIsometricView({ x: 100, y: 0, z: 100 }, origin, 30, 1), false);
+assert.equal(inIsometricView({ x: 100, y: 0, z: -100 }, origin, 30, 1), false);
+console.log(
+  "LOD checked: zoom transitions, hysteresis and offscreen animation bounds.",
+);
