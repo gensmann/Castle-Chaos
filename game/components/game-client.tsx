@@ -3,6 +3,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
+  playSound,
+  actionSound,
+  setSoundEnabled,
+  setSoundVolume,
+  unlockSound,
+  suspendSound,
+  disposeSound,
+} from "@/lib/game-audio";
+import {
   Castle,
   Swords,
   Users,
@@ -188,49 +197,6 @@ function Health({ player }: { player: Player }) {
     </div>
   );
 }
-let audioContext: AudioContext | null = null;
-function sound(
-  kind: "click" | "launch" | "impact" | "build" | "turn",
-  enabled: boolean,
-) {
-  if (!enabled) return;
-  try {
-    const Ctx =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext;
-    const ctx = (audioContext ??= new Ctx());
-    if (ctx.state === "suspended") void ctx.resume().catch(() => {});
-    const gain = ctx.createGain();
-    gain.gain.value = 0.075;
-    gain.connect(ctx.destination);
-    const osc = ctx.createOscillator();
-    osc.type = kind === "impact" ? "sawtooth" : "sine";
-    osc.frequency.setValueAtTime(
-      kind === "impact"
-        ? 100
-        : kind === "launch"
-          ? 220
-          : kind === "turn"
-            ? 440
-            : 640,
-      ctx.currentTime,
-    );
-    osc.frequency.exponentialRampToValueAtTime(
-      kind === "impact" ? 25 : kind === "launch" ? 60 : 880,
-      ctx.currentTime + 0.35,
-    );
-    osc.connect(gain);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.5);
-    osc.onended = () => {
-      osc.disconnect();
-      gain.disconnect();
-    };
-  } catch {}
-}
-
 export default function GameClient({ signedIn }: { signedIn: boolean }) {
   const [game, setGame] = useState<Game | null>(null);
   const [me, setMe] = useState("you");
@@ -252,6 +218,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   const [onlineError, setOnlineError] = useState("");
   const [copied, setCopied] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
+  const [soundVolume, setVolume] = useState(60);
   const [quality, setQuality] = useState<"high" | "low">("low");
   const [showMobileGuests, setShowMobileGuests] = useState(false);
   const [realmView, setRealmView] = useState(false);
@@ -264,9 +231,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   const battleRef = useRef<Battle | null>(null);
   const busyRef = useRef(false);
   const gameRef = useRef<Game | null>(null);
-  const soundRef = useRef(false);
   useEffect(() => {
-    soundRef.current = soundOn;
     gameRef.current = game;
   }, [soundOn, game]);
   const commandWorld = (kind: WorldCommand["kind"], id?: string) =>
@@ -291,7 +256,6 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
         const next = queue.current.shift()!;
         battleRef.current = next;
         setBattle(next);
-        sound("launch", soundRef.current);
       } else if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
         queue.current = [];
     }
@@ -331,7 +295,16 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
     setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     let preferredQuality: "high" | "low" = "low";
     try {
-      setSoundOn(localStorage.getItem("castle-sound") === "on");
+      const enabled = localStorage.getItem("castle-sound") === "on";
+      setSoundOn(enabled);
+      setSoundEnabled(enabled);
+      const storedVolume = localStorage.getItem("castle-volume");
+      const savedVolume = storedVolume === null ? 60 : Number(storedVolume);
+      const level = Number.isFinite(savedVolume)
+        ? Math.max(0, Math.min(100, savedVolume))
+        : 60;
+      setVolume(level);
+      setSoundVolume(level / 100);
       const saved = localStorage.getItem("castle-quality");
       if (saved === "low" || saved === "high") preferredQuality = saved;
     } catch {
@@ -378,12 +351,24 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
     return () => clearInterval(id);
   }, []);
   useEffect(() => {
-    const impact = () => sound("impact", soundRef.current);
-    document.addEventListener("siege-impact", impact, true);
+    const unlock = () => void unlockSound();
+    const visibility = () => {
+      if (document.hidden) suspendSound();
+    };
+    const click = (e: MouseEvent) => {
+      const button = (e.target as Element).closest?.("button, [role=tab]");
+      if (button && !button.hasAttribute("disabled")) playSound("click");
+    };
+    document.addEventListener("pointerdown", unlock, true);
+    document.addEventListener("keydown", unlock, true);
+    document.addEventListener("click", click);
+    document.addEventListener("visibilitychange", visibility);
     return () => {
-      document.removeEventListener("siege-impact", impact, true);
-      if (audioContext) void audioContext.close().catch(() => {});
-      audioContext = null;
+      document.removeEventListener("pointerdown", unlock, true);
+      document.removeEventListener("keydown", unlock, true);
+      document.removeEventListener("click", click);
+      document.removeEventListener("visibilitychange", visibility);
+      disposeSound();
     };
   }, []);
   const finishBattle = useCallback(() => {
@@ -391,7 +376,6 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
       const next = queue.current.shift()!;
       battleRef.current = next;
       setBattle(next);
-      sound("launch", soundRef.current);
     } else {
       battleRef.current = null;
       setBattle(null);
@@ -429,7 +413,8 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
         setRevision(data.revision);
         setConnected(true);
       } else displayGame(runBots(applyAction(game, me, action)));
-      sound(action.type === "end" ? "turn" : "build", soundOn);
+      const cue = actionSound(action);
+      if (cue) playSound(cue);
       if (
         ["build", "craft", "recruit", "feast", "repair"].includes(action.type)
       )
@@ -451,6 +436,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
       if (action.type === "quest" || action.type === "recruit")
         setSelectedGuest(null);
     } catch (e) {
+      playSound("error");
       toast.error(
         e instanceof Error
           ? e.message
@@ -517,12 +503,13 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
   function toggleSound() {
     const v = !soundOn;
     setSoundOn(v);
+    setSoundEnabled(v);
+    if (v) void unlockSound().then(() => playSound("click"));
     try {
       localStorage.setItem("castle-sound", v ? "on" : "off");
     } catch {
       /* Sound still works when preferences cannot be stored. */
     }
-    sound("click", v);
   }
   async function copyInvite() {
     if (!game) return;
@@ -667,7 +654,7 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
           selection={selection}
           onSelectPlot={(n) => {
             setSelection(n);
-            sound("click", soundOn);
+            playSound("click");
           }}
           onSelectPlayer={(id) => {
             if (id === me) commandWorld("home");
@@ -1773,11 +1760,40 @@ export default function GameClient({ signedIn }: { signedIn: boolean }) {
                 <span>
                   <Volume2 size={18} />
                   Sound effects
-                  <small>Subtle clicks, launches and impacts.</small>
+                  <small>
+                    Footsteps, village work, building and distinct siege
+                    effects.
+                  </small>
                 </span>
                 <button className="outline-button" onClick={toggleSound}>
                   {soundOn ? "On" : "Off"}
                 </button>
+              </div>
+              <div>
+                <label htmlFor="sound-volume">
+                  Sound volume <small>{soundVolume}%</small>
+                </label>
+                <input
+                  id="sound-volume"
+                  aria-label="Sound volume"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={soundVolume}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    setVolume(value);
+                    setSoundVolume(value / 100);
+                    try {
+                      localStorage.setItem("castle-volume", String(value));
+                    } catch {
+                      /* Optional preference. */
+                    }
+                  }}
+                  onPointerUp={() => playSound("click")}
+                  onKeyUp={() => playSound("click")}
+                />
               </div>
               <div>
                 <span>

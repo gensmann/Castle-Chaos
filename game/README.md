@@ -21,6 +21,7 @@ The portable starter provides **local-only mock sign-in** at `/signin-with-chatg
 npm run typecheck
 npm run check:rules
 npm run check:controls
+npm run check:audio
 # Requires the production Worker running locally on port 8787:
 npm run check:api
 ```
@@ -63,7 +64,7 @@ Trees, rocks, cottages, workshops, taverns and keeps use original painted sprite
 
 `components/world-life.ts` supplies carrying villagers, workshop hammering, chimney smoke and birds. Workers are decorative and do not alter resource rules. Flags deform, siege axles release and reset, and the river animates analytically without a reflection render pass. Static castle decoration is merged and its world matrices are frozen. Animation handles and disposed emitters are pruned after rebuilding.
 
-Performance graphics are the default: at most one device pixel per CSS pixel, simpler terrain and masonry, sparse scenery, no glow pass, lower shadow filtering and a shadow refresh every four frames outside physics. Quiet gameplay caps rendering at 30 fps; camera transitions and sieges may use up to 60. High adds denser scenery, finer masonry, glow and up to 1.6 device pixels per CSS pixel, capped at 60 fps. Explicit user graphics choices persist. Havok only simulates while rubble is active, pauses once pieces settle, and is reused across quality changes. Hidden pages skip rendering. Reduced-motion preferences stop ambient movement and automatic siege replays. Audio starts after a user's sound toggle and shares one context.
+Performance graphics are the default: at most one device pixel per CSS pixel, simpler terrain and masonry, sparse scenery, no glow pass, lower shadow filtering and a shadow refresh every four frames outside physics. Quiet gameplay caps rendering at 30 fps; camera transitions and sieges may use up to 60. High adds denser scenery, finer masonry, glow and up to 1.6 device pixels per CSS pixel, capped at 60 fps. Explicit user graphics choices persist. Havok only simulates while rubble is active, pauses once pieces settle, and is reused across quality changes. Hidden pages skip rendering. Reduced-motion preferences stop ambient movement and automatic siege replays. Audio shares one context and starts only after an enabled user gesture.
 
 LOD follows projected size (viewport height / orthographic span), because camera distance alone does not change size in this projection. Near detail retains grass, flowers, birds and smoke with up to 12 sprite frame updates per second; middle detail removes tiny scenery, reduces smoke and uses up to 6 sprite updates per second; far detail hides decorative workers, smoke and merged castle trim while retaining buildings, ramparts, selection and physics. The king remains visible with an idle frame. Hysteresis prevents detail flicker around zoom thresholds. Offscreen characters skip animation uploads; movement and gameplay continue independently. Texture mipmaps reduce texture detail automatically.
 
@@ -72,6 +73,12 @@ Character/LOD verification on 26 September 2026 covered all three zoom tiers and
 The canvas exposes `data-lod`, `data-characters`, `data-projection`, `data-camera-angles`, `data-camera-target`, `data-view-span`, `data-frame-budget`, `data-fps`, `data-active-meshes`, `data-quality` and `data-physics` for lightweight diagnostics. These are current samples, not hardware benchmarks.
 
 The sprite build was checked in the local production Worker on 26 September 2026: settlement, timber hall and workshop construction, trebuchet crafting and firing, Havok rubble, return to the 30 fps idle cap, and High/Performance switching without console errors or warnings. Isometric pan, zoom and overview framing were also checked at 390×844 and 844×390 browser viewports.
+
+### Sound effects
+
+`lib/game-audio.ts` provides layered procedural Web Audio effects with no downloaded samples: wooden construction, stonework, smithing, footsteps, recruitment, feasts, turn chimes and weapon-specific launches. Projectile impact audio is triggered by the renderer at collision time. Visible characters emit quiet, stereo-positioned steps and hammer strikes; far LOD and offscreen workers are silent. Sound is off by default. Settings expose a persisted 0–100% volume control independent of mute.
+
+The shared master bus has a compressor and a 40-voice cap. Repeated cues are throttled, completed nodes disconnect, mute stops scheduled tails, and hidden pages suspend audio. Stored preferences cannot start an AudioContext without a pointer/key gesture; another gesture resumes audio after returning to a hidden tab. The audio check covers lifecycle guards and cue mapping using a graph stub. Browser verification covers context startup, the worker cue, volume, immediate mute and absence of console errors; it does not constitute subjective listening on physical speakers.
 
 ### Mobile controls and verification
 

@@ -7,6 +7,7 @@ import { HOME_POSITIONS, CLEARINGS, positionOf } from "@/lib/game";
 import { createWaterMaterial } from "./world-atmosphere";
 import { createIsometricCamera } from "./isometric-camera";
 import { createWorldLife } from "./world-life";
+import { playSound, siegeSound } from "@/lib/game-audio";
 import { detailLevel, type DetailLevel } from "@/lib/isometric-view";
 import { villageTexture } from "./world-materials";
 import { createVillageSprites, type VillageSprite } from "./world-sprites";
@@ -1601,6 +1602,7 @@ function createWorld(
           : rock,
     );
     battleState = { event: b, time: 0, projectile, start, end, hit: false };
+    playSound(siegeSound(b.weapon));
     view.lock(true);
     const apex = Vector3.Center(start, end).add(new Vector3(0, 14.2, 0));
     view.frame([start, end, apex], 10);
@@ -1760,9 +1762,7 @@ function createWorld(
         b.projectile.setEnabled(false);
         const magic = ["arcane", "scientist"].includes(b.event.weapon);
         if (b.event.damage > 0) shatter(b.event.to, b.end, magic);
-        canvas.dispatchEvent(
-          new CustomEvent("siege-impact", { detail: b.event }),
-        );
+        playSound("impact", Math.min(1, 0.5 + b.event.damage / 180));
       }
       if (b.time > 5.3) {
         b.projectile.dispose();

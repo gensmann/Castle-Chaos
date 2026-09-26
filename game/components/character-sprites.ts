@@ -7,6 +7,8 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Material } from "@babylonjs/core/Materials/material";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Scene } from "@babylonjs/core/scene";
+import { playSound } from "@/lib/game-audio";
+import { projectIsometric } from "@/lib/isometric-view";
 import { inIsometricView, type DetailLevel } from "@/lib/isometric-view";
 import type { MapPoint } from "@/lib/isometric-view";
 
@@ -110,6 +112,26 @@ export function createCharacterSprites(scene: Scene) {
                   ? Math.floor(stride) % 4
                   : 1;
           if (frame === lastFrame && facingLeft === lastFacing) return;
+          if (
+            frame !== lastFrame &&
+            lastFrame >= 0 &&
+            dt > 0 &&
+            level !== "far"
+          ) {
+            const position = projectIsometric(root.getAbsolutePosition());
+            const focus = projectIsometric(target);
+            const pan = (position.x - focus.x) / ((span * aspect) / 2);
+            const distance = Math.min(
+              1,
+              Math.hypot(position.x - focus.x, position.y - focus.y) /
+                (span * 0.65),
+            );
+            const strength = (royal ? 0.5 : 0.2) * (1 - distance * 0.7);
+            if (activity === "hammer" && frame === 2)
+              playSound("hammer", strength, pan);
+            else if (speed > 0.08 && frame % 2 === 0)
+              playSound("step", strength, pan);
+          }
           lastFrame = frame;
           lastFacing = facingLeft;
           const left = (frame + 0.003) / 4,

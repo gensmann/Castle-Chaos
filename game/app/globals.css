@@ -5023,3 +5023,15 @@ a {
   height: 76px;
   margin-top: 0;
 }
+
+.settings-content #sound-volume {
+  width: min(180px, 42vw);
+  min-height: 44px;
+  accent-color: #d6bc78;
+  cursor: pointer;
+}
+.settings-content label[for="sound-volume"] small {
+  display: block;
+  margin-top: 4px;
+  color: #b2baa5;
+}

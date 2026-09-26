@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "check:rules": "node --experimental-strip-types scripts/check-rules.mjs",
     "check:controls": "node --experimental-strip-types scripts/check-controls.mjs",
-    "check:api": "node scripts/check-api.mjs"
+    "check:api": "node scripts/check-api.mjs",
+    "check:audio": "node --experimental-strip-types scripts/check-audio.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.0.0",
